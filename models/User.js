@@ -8,5 +8,6 @@ const userSchema = new mongoose.Schema({
     otp: { type: String },
     otpExpiry: { type: Date },
     isOtpVerified: { type: Boolean, default: false },
+    profileImage: { type: String }
 }, { timestamps: true });
 export default mongoose.model('User', userSchema);

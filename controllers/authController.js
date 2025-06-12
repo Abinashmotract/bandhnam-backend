@@ -15,8 +15,6 @@ const transporter = nodemailer.createTransport({
 
 export const signup = async (req, res) => {
     const { name, email, phoneNumber, password } = req.body;
-
-    // Validate phone number (must be exactly 10 digits)
     const phoneRegex = /^[0-9]{10}$/;
     if (!phoneRegex.test(phoneNumber)) {
         return res.status(400).json({
@@ -25,17 +23,7 @@ export const signup = async (req, res) => {
             message: 'Phone number must be exactly 10 digits.',
         });
     }
-
-    // ✅ Validate password strength
-    const passwordRegex =
-        /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
-    // Explanation:
-    // - At least one lowercase letter
-    // - At least one uppercase letter
-    // - At least one digit
-    // - At least one special character
-    // - Minimum 8 characters long
-
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
     if (!passwordRegex.test(password)) {
         return res.status(400).json({
             success: false,
@@ -82,7 +70,6 @@ export const signup = async (req, res) => {
                 console.log('Email sent:', info.response);
             }
         });
-
         return res.status(201).json({
             success: true,
             status: 201,
@@ -138,6 +125,49 @@ export const login = async (req, res) => {
     }
 };
 
+export const updateUser = async (req, res) => {
+    const userId = req.params.id;
+    const { name, phoneNumber } = req.body;
+    const profileImage = req.file ? req.file.path : undefined;
+
+    try {
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                status: 404,
+                message: 'User not found'
+            });
+        }
+
+        user.name = name || user.name;
+        user.phoneNumber = phoneNumber || user.phoneNumber;
+        if (profileImage) user.profileImage = profileImage;
+
+        await user.save();
+
+        res.status(200).json({
+            success: true,
+            status: 200,
+            message: 'User updated successfully',
+            data: {
+                _id: user._id,
+                name: user.name,
+                email: user.email,
+                phoneNumber: user.phoneNumber,
+                profileImage: user.profileImage,
+            }
+        });
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            status: 500,
+            message: 'Server error',
+            error: err.message
+        });
+    }
+};
+
 export const refreshAccessToken = (req, res) => {
     const { refreshToken } = req.body;
 
@@ -183,6 +213,31 @@ export const forgotPassword = async (req, res) => {
         });
 
         res.status(200).json({ success: true, message: 'OTP sent to your email' });
+    } catch (err) {
+        res.status(500).json({ success: false, message: 'Server error', error: err.message });
+    }
+};
+
+export const resendOtp = async (req, res) => {
+    const { email } = req.body;
+    try {
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+        // Generate new OTP and expiry
+        const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
+        const newOtpExpiry = Date.now() + 10 * 60 * 1000; // 10 minutes
+        user.otp = newOtp;
+        user.otpExpiry = newOtpExpiry;
+        await user.save();
+        await transporter.sendMail({
+            from: 'kumarsinha2574@gmail.com',
+            to: email,
+            subject: 'Your New OTP for Password Reset',
+            text: `Your new OTP is: ${newOtp}`,
+        });
+        res.status(200).json({ success: true, message: 'New OTP sent to your email' });
     } catch (err) {
         res.status(500).json({ success: false, message: 'Server error', error: err.message });
     }
@@ -277,7 +332,6 @@ export const resetPassword = async (req, res) => {
     }
 };
 
-// Get Logged-in User Details by Token
 export const getUserDetailsById = async (req, res) => {
     try {
         const user = await User.findById(req.user._id).select('-password -otp -otpExpiry -isOtpVerified');
