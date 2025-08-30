@@ -47,29 +47,29 @@ export const signup = async (req, res) => {
         const user = await User.create({ name, email, phoneNumber, password: hashed });
 
         // Send welcome email
-        // const mailOptions = {
-        //     from: 'Kumarsinha2574@gmail.com',
-        //     to: email,
-        //     subject: 'Welcome to Your App!',
-        //     html: `
-        //         <h2>Hello ${name},</h2>
-        //         <p>Thank you for registering with us.</p>
-        //         <p><strong>Your login details:</strong></p>
-        //         <ul>
-        //             <li><strong>Email:</strong> ${email}</li>
-        //             <li><strong>Password:</strong> ${password}</li>
-        //         </ul>
-        //         <p>Keep this information secure.</p>
-        //     `
-        // };
+        const mailOptions = {
+            from: 'Kumarsinha2574@gmail.com',
+            to: email,
+            subject: 'Welcome to Your App!',
+            html: `
+                <h2>Hello ${name},</h2>
+                <p>Thank you for registering with us.</p>
+                <p><strong>Your login details:</strong></p>
+                <ul>
+                    <li><strong>Email:</strong> ${email}</li>
+                    <li><strong>Password:</strong> ${password}</li>
+                </ul>
+                <p>Keep this information secure.</p>
+            `
+        };
 
-        // transporter.sendMail(mailOptions, (error, info) => {
-        //     if (error) {
-        //         console.error('Error sending mail:', error);
-        //     } else {
-        //         console.log('Email sent:', info.response);
-        //     }
-        // });
+        transporter.sendMail(mailOptions, (error, info) => {
+            if (error) {
+                console.error('Error sending mail:', error);
+            } else {
+                console.log('Email sent:', info.response);
+            }
+        });
         return res.status(201).json({
             success: true,
             status: 201,
