@@ -14,9 +14,49 @@ const transporter = nodemailer.createTransport({
 });
 
 export const signup = async (req, res) => {
-    const { name, email, phoneNumber, password } = req.body;
+    const {
+        name,
+        email,
+        mobile,
+        password,
+        confirmPassword,
+        profileFor,
+        gender,
+        dob,
+        occupation,
+        location,
+        agreeToTerms
+    } = req.body;
+    if (!name || !email || !mobile || !password || !profileFor) {
+        return res.status(400).json({
+            success: false,
+            status: 400,
+            message: 'All required fields must be provided',
+        });
+    }
+    if (password !== confirmPassword) {
+        return res.status(400).json({
+            success: false,
+            status: 400,
+            message: 'Passwords do not match',
+        });
+    }
+    if (!agreeToTerms) {
+        return res.status(400).json({
+            success: false,
+            status: 400,
+            message: 'You must agree to the terms and conditions',
+        });
+    }
+    if ((profileFor === 'self' || profileFor === 'relative' || profileFor === 'friend') && !gender) {
+        return res.status(400).json({
+            success: false,
+            status: 400,
+            message: 'Gender is required for this profile type',
+        });
+    }
     const phoneRegex = /^[0-9]{10}$/;
-    if (!phoneRegex.test(phoneNumber)) {
+    if (!phoneRegex.test(mobile)) {
         return res.status(400).json({
             success: false,
             status: 400,
@@ -28,41 +68,63 @@ export const signup = async (req, res) => {
         return res.status(400).json({
             success: false,
             status: 400,
-            message:
-                'Password must be at least 8 characters and include one uppercase letter, one lowercase letter, one number, and one special character.',
+            message: 'Password must be at least 8 characters and include one uppercase letter, one lowercase letter, one number, and one special character.',
         });
     }
-
     try {
-        const userExists = await User.findOne({ email });
+        const userExists = await User.findOne({
+            $or: [{ email }, { phoneNumber: mobile }]
+        });
+
         if (userExists) {
             return res.status(400).json({
                 success: false,
                 status: 400,
-                message: 'User already exists',
+                message: 'User with this email or phone number already exists',
             });
         }
 
         const hashed = await bcrypt.hash(password, 10);
-        const user = await User.create({ name, email, phoneNumber, password: hashed });
-
-        // Send welcome email
+        let finalGender = gender;
+        if (!finalGender) {
+            if (profileFor === 'son' || profileFor === 'brother') {
+                finalGender = 'male';
+            } else if (profileFor === 'daughter' || profileFor === 'sister') {
+                finalGender = 'female';
+            }
+        }
+        const user = await User.create({
+            name,
+            email,
+            phoneNumber: mobile,
+            password: hashed,
+            profileFor,
+            gender: finalGender,
+            dob,
+            occupation,
+            location,
+            agreeToTerms
+        });
         const mailOptions = {
             from: 'Kumarsinha2574@gmail.com',
             to: email,
-            subject: 'Welcome to Your App!',
+            subject: 'Welcome to Bandhan Nammatch!',
             html: `
                 <h2>Hello ${name},</h2>
-                <p>Thank you for registering with us.</p>
-                <p><strong>Your login details:</strong></p>
+                <p>Thank you for registering with Bandhan Nammatch - your journey to find the perfect partner begins now!</p>
+                <p><strong>Your registration details:</strong></p>
                 <ul>
+                    <li><strong>Name:</strong> ${name}</li>
                     <li><strong>Email:</strong> ${email}</li>
-                    <li><strong>Password:</strong> ${password}</li>
+                    <li><strong>Phone:</strong> ${mobile}</li>
+                    <li><strong>Profile For:</strong> ${profileFor}</li>
+                    ${finalGender ? `<li><strong>Gender:</strong> ${finalGender}</li>` : ''}
                 </ul>
-                <p>Keep this information secure.</p>
+                <p>We're excited to help you find your perfect match. Login to explore profiles and start connecting!</p>
+                <br />
+                <p>Best regards,<br>Bandhan Nammatch Team</p>
             `
         };
-
         transporter.sendMail(mailOptions, (error, info) => {
             if (error) {
                 console.error('Error sending mail:', error);
@@ -74,6 +136,14 @@ export const signup = async (req, res) => {
             success: true,
             status: 201,
             message: 'User registered successfully. Welcome email sent.',
+            data: {
+                _id: user._id,
+                name: user.name,
+                email: user.email,
+                phoneNumber: user.phoneNumber,
+                profileFor: user.profileFor,
+                gender: user.gender,
+            }
         });
     } catch (err) {
         return res.status(500).json({
@@ -86,44 +156,60 @@ export const signup = async (req, res) => {
 };
 
 export const login = async (req, res) => {
-    const { identifier, password } = req.body;
+    const { identifier, email, password } = req.body;
+    const loginId = identifier || email;
+    if (!loginId || !password) {
+        return res.status(400).json({
+            success: false,
+            statusCode: 400,
+            message: "Email/phone and password are required",
+        });
+    }
     try {
         const user = await User.findOne({
-            $or: [{ email: identifier }, { phoneNumber: identifier }],
+            $or: [{ email: loginId }, { phoneNumber: loginId }],
         });
+
         if (!user) {
             return res.status(401).json({
                 success: false,
-                message: identifier.includes('@')
-                    ? 'Email not found'
-                    : 'Phone number not found'
+                statusCode: 401,
+                message: loginId.includes("@")
+                    ? "Email not found"
+                    : "Phone number not found",
             });
         }
-        const match = await bcrypt.compare(password, user.password);
-        if (!match) {
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        if (!isPasswordValid) {
             return res.status(401).json({
                 success: false,
-                message: 'Incorrect password'
+                statusCode: 401,
+                message: "Incorrect password",
             });
         }
         const accessToken = generateAccessToken(user._id);
         const refreshToken = generateRefreshToken(user._id);
-        res.status(200).json({
+        return res.status(200).json({
             success: true,
-            message: 'Login successful',
+            statusCode: 200,
+            message: "Login successful",
             data: {
-                _id: user._id,
-                name: user.name,
-                email: user.email,
-                phoneNumber: user.phoneNumber,
                 accessToken,
                 refreshToken,
             },
         });
     } catch (err) {
-        res.status(500).json({ success: false, message: 'Server error', error: err.message });
+        console.error("Login error:", err);
+        return res.status(500).json({
+            success: false,
+            statusCode: 500,
+            message: "Server error",
+            error: err.message,
+        });
     }
 };
+
+
 
 export const updateUser = async (req, res) => {
     const userId = req.params.id;
@@ -242,7 +328,6 @@ export const resendOtp = async (req, res) => {
         res.status(500).json({ success: false, message: 'Server error', error: err.message });
     }
 };
-
 
 export const verifyOtp = async (req, res) => {
     const { email, otp } = req.body;

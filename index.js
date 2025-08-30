@@ -4,11 +4,19 @@ import connectDB from './config/db.js';
 import authRoutes from './routes/authRoutes.js';
 import { Server } from "socket.io";
 import http from 'http';
+import cors from 'cors';
 
 dotenv.config();
 connectDB();
 
 const app = express();
+
+// ✅ Enable CORS for your frontend (http://localhost:5173)
+app.use(cors({
+  origin: "http://localhost:5173",
+  credentials: true
+}));
+
 app.use(express.json());
 
 // 👉 Serve static files from the 'public' directory
@@ -17,7 +25,7 @@ app.use(express.static('public'));
 const server = http.createServer(app);
 
 const io = new Server(server, {
-  cors: { origin: "*", }
+  cors: { origin: "http://localhost:5173", }
 });
 
 io.on("connection", (socket) => {
