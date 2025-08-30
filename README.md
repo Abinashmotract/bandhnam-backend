@@ -37,4 +37,4 @@
 
 ---
 
-> **Note:** Some routes require authentication and/or specific roles. See the `middlewares/authMiddleware.js` for details. 
+> **Note:** Some routes require authentication and/or specific roles. See the `middlewares/authMiddleware.js` for details. # bandhnam-backend
