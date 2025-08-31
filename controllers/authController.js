@@ -1,6 +1,6 @@
 import User from '../models/User.js';
 import bcrypt from 'bcryptjs';
-import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
 import { generateAccessToken, generateRefreshToken } from '../utils/generateToken.js';
 import sendEmail from '../utils/sendEmail.js';
 import nodemailer from 'nodemailer';
@@ -360,145 +360,188 @@ export const updateUser = async (req, res) => {
 
 export const forgotPassword = async (req, res) => {
     const { email } = req.body;
-
+    if (!email) {
+        return res.status(400).json({
+            success: false,
+            status: 400,
+            message: 'Email is required'
+        });
+    }
     try {
         const user = await User.findOne({ email });
         if (!user) {
-            return res.status(404).json({ success: false, message: 'User not found' });
+            return res.status(200).json({
+                success: true,
+                status: 200,
+                message: 'If the email exists, a password reset OTP has been sent'
+            });
         }
-
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
-        const otpExpiry = Date.now() + 10 * 60 * 1000; // 10 minutes
-
+        const otpExpiry = Date.now() + 10 * 60 * 1000;
         user.otp = otp;
         user.otpExpiry = otpExpiry;
+        user.isOtpVerified = false;
         await user.save();
-
-        // Send OTP via email
-        await transporter.sendMail({
-            from: 'kumarsinha2574@gmail.com',
-            to: email,
-            subject: 'Your OTP for Password Reset',
-            text: `Your OTP is: ${otp}`,
+        const html = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #d81b60;">Password Reset Request</h2>
+                <p>Hello ${user.name},</p>
+                <p>You requested to reset your password. Use the OTP below to proceed:</p>
+                <div style="background-color: #f8bbd0; padding: 15px; text-align: center; margin: 20px 0; border-radius: 5px;">
+                    <h1 style="margin: 0; color: #d81b60; letter-spacing: 5px;">${otp}</h1>
+                </div>
+                <p>This OTP will expire in 10 minutes.</p>
+                <p>If you didn't request this reset, please ignore this email.</p>
+                <br />
+                <p>Best regards,<br>Bandhan Nammatch Team</p>
+            </div>
+        `;
+        await sendEmail(email, 'Password Reset OTP - Bandhan Nammatch', html);
+        return res.status(200).json({
+            success: true,
+            status: 200,
+            message: 'If the email exists, a password reset OTP has been sent'
         });
-
-        res.status(200).json({ success: true, message: 'OTP sent to your email' });
     } catch (err) {
-        res.status(500).json({ success: false, message: 'Server error', error: err.message });
+        console.error('Forgot password error:', err);
+        return res.status(500).json({
+            success: false,
+            status: 500,
+            message: 'Server error',
+            error: err.message
+        });
     }
 };
 
+// -------------------- RESEND OTP --------------------
 export const resendOtp = async (req, res) => {
     const { email } = req.body;
+    if (!email) return res.status(400).json({ success: false, status: 400, message: 'Email is required' });
+
     try {
         const user = await User.findOne({ email });
-        if (!user) {
-            return res.status(404).json({ success: false, message: 'User not found' });
+        if (!user) return res.status(200).json({ success: true, status: 200, message: 'If the email exists, a new OTP has been sent' });
+
+        if (user.otpExpiry > Date.now() && user.otp) {
+            const minutesLeft = Math.ceil((user.otpExpiry - Date.now()) / 1000 / 60);
+            return res.status(429).json({ success: false, status: 429, message: `Wait ${minutesLeft} min before requesting new OTP` });
         }
-        // Generate new OTP and expiry
+
         const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
-        const newOtpExpiry = Date.now() + 10 * 60 * 1000; // 10 minutes
         user.otp = newOtp;
-        user.otpExpiry = newOtpExpiry;
+        user.otpExpiry = Date.now() + 10 * 60 * 1000;
+        user.isOtpVerified = false;
         await user.save();
-        await transporter.sendMail({
-            from: 'kumarsinha2574@gmail.com',
-            to: email,
-            subject: 'Your New OTP for Password Reset',
-            text: `Your new OTP is: ${newOtp}`,
-        });
-        res.status(200).json({ success: true, message: 'New OTP sent to your email' });
+
+        const html = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #d81b60;">New OTP for Password Reset</h2>
+                <p>Hello ${user.name},</p>
+                <p>Your new OTP is:</p>
+                <div style="background-color: #f8bbd0; padding: 15px; text-align: center; margin: 20px 0; border-radius: 5px;">
+                    <h1 style="margin: 0; color: #d81b60; letter-spacing: 5px;">${newOtp}</h1>
+                </div>
+                <p>This OTP will expire in 10 minutes.</p>
+                <br />
+                <p>Best regards,<br>Bandhan Nammatch Team</p>
+            </div>
+        `;
+        await sendEmail(email, 'New OTP for Password Reset - Bandhan Nammatch', html);
+
+        res.status(200).json({ success: true, status: 200, message: 'New OTP sent successfully' });
     } catch (err) {
-        res.status(500).json({ success: false, message: 'Server error', error: err.message });
+        console.error('Resend OTP error:', err);
+        res.status(500).json({ success: false, status: 500, message: 'Server error', error: err.message });
     }
 };
 
+// -------------------- VERIFY OTP --------------------
 export const verifyOtp = async (req, res) => {
     const { email, otp } = req.body;
+    if (!email || !otp) return res.status(400).json({ success: false, status: 400, message: 'Email and OTP are required' });
 
     try {
         const user = await User.findOne({ email });
-
         if (!user || user.otp !== otp || user.otpExpiry < Date.now()) {
-            return res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
+            return res.status(400).json({ success: false, status: 400, message: 'Invalid or expired OTP' });
         }
 
-        user.otp = null;
-        user.otpExpiry = null;
         user.isOtpVerified = true;
         await user.save();
 
-        res.status(200).json({ success: true, message: 'OTP verified successfully' });
+        const resetToken = jwt.sign(
+            { userId: user._id, purpose: 'password_reset' },
+            process.env.JWT_SECRET || 'your-secret-key',
+            { expiresIn: '15m' }
+        );
+
+        // Optional: send confirmation email that OTP verified
+        const html = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #d81b60;">OTP Verified Successfully</h2>
+                <p>Hello ${user.name},</p>
+                <p>Your OTP has been verified. You can now reset your password.</p>
+                <br />
+                <p>Best regards,<br>Bandhan Nammatch Team</p>
+            </div>
+        `;
+        await sendEmail(email, 'OTP Verified - Bandhan Nammatch', html);
+
+        res.status(200).json({ success: true, status: 200, message: 'OTP verified successfully', data: { resetToken, email: user.email } });
     } catch (err) {
-        res.status(500).json({ success: false, message: 'Server error', error: err.message });
+        console.error('Verify OTP error:', err);
+        res.status(500).json({ success: false, status: 500, message: 'Server error', error: err.message });
     }
 };
 
+// -------------------- RESET PASSWORD --------------------
 export const resetPassword = async (req, res) => {
-    const { email, newPassword } = req.body;
+    const { email, newPassword, confirmPassword, resetToken } = req.body;
+    if (!email || !newPassword || !confirmPassword) return res.status(400).json({ success: false, status: 400, message: 'Email, new password and confirmation are required' });
+    if (newPassword !== confirmPassword) return res.status(400).json({ success: false, status: 400, message: 'Passwords do not match' });
+
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
+    if (!passwordRegex.test(newPassword)) return res.status(400).json({ success: false, status: 400, message: 'Password must meet complexity requirements' });
 
     try {
         const user = await User.findOne({ email });
-        if (!user) {
-            return res.status(404).json({ success: false, message: 'User not found' });
-        }
+        if (!user) return res.status(404).json({ success: false, status: 404, message: 'User not found' });
 
-        // 🔐 Check if OTP was verified
-        if (!user.isOtpVerified) {
-            return res.status(403).json({
-                success: false,
-                message: 'OTP not verified. Cannot reset password.',
-            });
+        if (!user.isOtpVerified) return res.status(403).json({ success: false, status: 403, message: 'OTP not verified' });
+
+        // Verify reset token
+        if (resetToken) {
+            try {
+                const decoded = jwt.verify(resetToken, process.env.JWT_SECRET || 'your-secret-key');
+                if (decoded.userId !== user._id.toString() || decoded.purpose !== 'password_reset') {
+                    return res.status(403).json({ success: false, status: 403, message: 'Invalid reset token' });
+                }
+            } catch {
+                return res.status(403).json({ success: false, status: 403, message: 'Invalid or expired reset token' });
+            }
         }
 
         const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-        // Reset OTP and verification status
+        user.password = hashedPassword;
         user.otp = null;
         user.otpExpiry = null;
-        user.isOtpVerified = false; // 🔒 Prevent reuse
-        user.password = hashedPassword;
-
+        user.isOtpVerified = false;
         await user.save();
 
-        // Send confirmation email
-        const mailOptions = {
-            from: 'kumarsinha2574@gmail.com',
-            to: email,
-            subject: 'Your Password Has Been Reset',
-            html: `
-                <h2>Hello ${user.name},</h2>
+        const html = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #d81b60;">Password Reset Successful</h2>
+                <p>Hello ${user.name},</p>
                 <p>Your password has been successfully reset.</p>
-                <p><strong>Your updated login details:</strong></p>
-                <ul>
-                    <li><strong>Email:</strong> ${email}</li>
-                    <li><strong>New Password:</strong> ${newPassword}</li>
-                </ul>
-                <p>If you did not perform this action, please contact support immediately.</p>
                 <br />
-                <p>Best regards,<br>Your App Team</p>
-            `
-        };
+                <p>Best regards,<br>Bandhan Nammatch Team</p>
+            </div>
+        `;
+        await sendEmail(email, 'Password Reset Successful - Bandhan Nammatch', html);
 
-        transporter.sendMail(mailOptions, (error, info) => {
-            if (error) {
-                console.error('Error sending password reset email:', error);
-            } else {
-                console.log('Password reset email sent:', info.response);
-            }
-        });
-
-        res.status(200).json({
-            success: true,
-            message: 'Password reset successful and confirmation email sent.',
-        });
+        res.status(200).json({ success: true, status: 200, message: 'Password reset successful' });
     } catch (err) {
-        res.status(500).json({
-            success: false,
-            message: 'Server error',
-            error: err.message,
-        });
+        console.error('Reset password error:', err);
+        res.status(500).json({ success: false, status: 500, message: 'Server error', error: err.message });
     }
 };
-
-

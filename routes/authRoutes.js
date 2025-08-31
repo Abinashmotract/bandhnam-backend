@@ -22,7 +22,7 @@ router.post('/verify-otp', verifyOtp);
 router.post('/reset-password', resetPassword);
 
 // Protected routes (require authentication)
-router.post('/logout', VerifyToken, logout); // Add authentication middleware
+router.post('/logout', logout);
 router.get('/user', VerifyToken, getUserDetails);
 router.put('/user/update/:id', VerifyToken, upload.single('profileImage'), updateUser);
 
