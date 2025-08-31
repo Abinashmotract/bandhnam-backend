@@ -209,7 +209,111 @@ export const login = async (req, res) => {
     }
 };
 
+export const refreshAccessToken = async (req, res) => {
+    const { refreshToken } = req.body;
 
+    if (!refreshToken) {
+        return res.status(401).json({
+            success: false,
+            statusCode: 401,
+            message: 'Refresh token required'
+        });
+    }
+    try {
+        const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+        const user = await User.findById(decoded.id);
+        if (!user) {
+            return res.status(403).json({
+                success: false,
+                statusCode: 403,
+                message: 'User not found'
+            });
+        }
+        const newAccessToken = generateAccessToken(user._id);
+        const newRefreshToken = generateRefreshToken(user._id);
+
+        res.status(200).json({
+            success: true,
+            statusCode: 200,
+            message: 'Access token refreshed successfully',
+            data: {
+                accessToken: newAccessToken,
+                refreshToken: newRefreshToken // Send new refresh token if rotating
+            },
+        });
+    } catch (err) {
+        console.error('Refresh token error:', err);
+        if (err.name === 'TokenExpiredError') {
+            return res.status(403).json({
+                success: false,
+                statusCode: 403,
+                message: 'Refresh token expired'
+            });
+        }
+        if (err.name === 'JsonWebTokenError') {
+            return res.status(403).json({
+                success: false,
+                statusCode: 403,
+                message: 'Invalid refresh token'
+            });
+        }
+        return res.status(500).json({
+            success: false,
+            statusCode: 500,
+            message: 'Server error during token refresh',
+            error: err.message
+        });
+    }
+};
+
+export const logout = async (req, res) => {
+    try {
+        const { refreshToken } = req.body;
+        res.clearCookie('accessToken');
+        res.clearCookie('refreshToken');
+        res.status(200).json({
+            success: true,
+            statusCode: 200,
+            message: 'Logout successful',
+        });
+    } catch (error) {
+        console.error('Logout error:', error);
+        res.status(500).json({
+            success: false,
+            statusCode: 500,
+            message: 'Server error during logout',
+            error: error.message,
+        });
+    }
+};
+
+export const getUserDetails = async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id)
+            .select('-password -otp -otpExpiry -isOtpVerified');
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                statusCode: 404,
+                message: 'User not found',
+            });
+        }
+        return res.status(200).json({
+            success: true,
+            statusCode: 200,
+            message: 'User details fetched successfully',
+            data: user,
+        });
+    } catch (err) {
+        console.error("Get user details error:", err);
+        return res.status(500).json({
+            success: false,
+            statusCode: 500,
+            message: 'Server error while fetching user details',
+            error: err.message,
+        });
+    }
+};
 
 export const updateUser = async (req, res) => {
     const userId = req.params.id;
@@ -251,26 +355,6 @@ export const updateUser = async (req, res) => {
             message: 'Server error',
             error: err.message
         });
-    }
-};
-
-export const refreshAccessToken = (req, res) => {
-    const { refreshToken } = req.body;
-
-    if (!refreshToken) {
-        return res.status(401).json({ success: false, message: 'Refresh token required' });
-    }
-
-    try {
-        const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
-        const accessToken = generateAccessToken(decoded.id);
-
-        res.status(200).json({
-            success: true,
-            accessToken,
-        });
-    } catch (err) {
-        return res.status(403).json({ success: false, message: 'Invalid or expired refresh token' });
     }
 };
 
@@ -417,30 +501,4 @@ export const resetPassword = async (req, res) => {
     }
 };
 
-export const getUserDetailsById = async (req, res) => {
-    try {
-        const user = await User.findById(req.user._id).select('-password -otp -otpExpiry -isOtpVerified');
 
-        if (!user) {
-            return res.status(404).json({
-                success: false,
-                statusCode: 404,
-                message: 'User not found',
-            });
-        }
-
-        res.status(200).json({
-            success: true,
-            statusCode: 200,
-            message: 'User details fetched successfully',
-            user,
-        });
-    } catch (err) {
-        res.status(500).json({
-            success: false,
-            statusCode: 500,
-            message: 'Server error',
-            error: err.message,
-        });
-    }
-};
