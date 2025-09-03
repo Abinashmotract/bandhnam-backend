@@ -108,10 +108,10 @@ export const signup = async (req, res) => {
         const mailOptions = {
             from: 'Kumarsinha2574@gmail.com',
             to: email,
-            subject: 'Welcome to Bandhan Nammatch!',
+            subject: 'Welcome to Bandhnam Nammatch!',
             html: `
                 <h2>Hello ${name},</h2>
-                <p>Thank you for registering with Bandhan Nammatch - your journey to find the perfect partner begins now!</p>
+                <p>Thank you for registering with Bandhnam Nammatch - your journey to find the perfect partner begins now!</p>
                 <p><strong>Your registration details:</strong></p>
                 <ul>
                     <li><strong>Name:</strong> ${name}</li>
@@ -122,7 +122,7 @@ export const signup = async (req, res) => {
                 </ul>
                 <p>We're excited to help you find your perfect match. Login to explore profiles and start connecting!</p>
                 <br />
-                <p>Best regards,<br>Bandhan Nammatch Team</p>
+                <p>Best regards,<br>Bandhnam Nammatch Team</p>
             `
         };
         transporter.sendMail(mailOptions, (error, info) => {
@@ -393,10 +393,10 @@ export const forgotPassword = async (req, res) => {
                 <p>This OTP will expire in 10 minutes.</p>
                 <p>If you didn't request this reset, please ignore this email.</p>
                 <br />
-                <p>Best regards,<br>Bandhan Nammatch Team</p>
+                <p>Best regards,<br>Bandhnam Nammatch Team</p>
             </div>
         `;
-        await sendEmail(email, 'Password Reset OTP - Bandhan Nammatch', html);
+        await sendEmail(email, 'Password Reset OTP - Bandhnam Nammatch', html);
         return res.status(200).json({
             success: true,
             status: 200,
@@ -443,10 +443,10 @@ export const resendOtp = async (req, res) => {
                 </div>
                 <p>This OTP will expire in 10 minutes.</p>
                 <br />
-                <p>Best regards,<br>Bandhan Nammatch Team</p>
+                <p>Best regards,<br>Bandhnam Nammatch Team</p>
             </div>
         `;
-        await sendEmail(email, 'New OTP for Password Reset - Bandhan Nammatch', html);
+        await sendEmail(email, 'New OTP for Password Reset - Bandhnam Nammatch', html);
 
         res.status(200).json({ success: true, status: 200, message: 'New OTP sent successfully' });
     } catch (err) {
@@ -482,10 +482,10 @@ export const verifyOtp = async (req, res) => {
                 <p>Hello ${user.name},</p>
                 <p>Your OTP has been verified. You can now reset your password.</p>
                 <br />
-                <p>Best regards,<br>Bandhan Nammatch Team</p>
+                <p>Best regards,<br>Bandhnam Nammatch Team</p>
             </div>
         `;
-        await sendEmail(email, 'OTP Verified - Bandhan Nammatch', html);
+        await sendEmail(email, 'OTP Verified - Bandhnam Nammatch', html);
 
         res.status(200).json({ success: true, status: 200, message: 'OTP verified successfully', data: { resetToken, email: user.email } });
     } catch (err) {
@@ -534,10 +534,10 @@ export const resetPassword = async (req, res) => {
                 <p>Hello ${user.name},</p>
                 <p>Your password has been successfully reset.</p>
                 <br />
-                <p>Best regards,<br>Bandhan Nammatch Team</p>
+                <p>Best regards,<br>Bandhnam Nammatch Team</p>
             </div>
         `;
-        await sendEmail(email, 'Password Reset Successful - Bandhan Nammatch', html);
+        await sendEmail(email, 'Password Reset Successful - Bandhnam Nammatch', html);
 
         res.status(200).json({ success: true, status: 200, message: 'Password reset successful' });
     } catch (err) {
