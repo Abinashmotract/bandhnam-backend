@@ -316,9 +316,21 @@ export const getUserDetails = async (req, res) => {
 };
 
 export const updateUser = async (req, res) => {
-    const userId = req.params.id;
-    const { name, phoneNumber } = req.body;
-    const profileImage = req.file ? req.file.path : undefined;
+    const userId = req.user._id; // Get user ID from authenticated request
+    const {
+        name,
+        phoneNumber,
+        dob,
+        occupation,
+        location,
+        education,
+        motherTongue,
+        religion,
+        caste,
+        about,
+        interests,
+        preferences
+    } = req.body;
 
     try {
         const user = await User.findById(userId);
@@ -330,12 +342,64 @@ export const updateUser = async (req, res) => {
             });
         }
 
+        // Update basic information
         user.name = name || user.name;
         user.phoneNumber = phoneNumber || user.phoneNumber;
-        if (profileImage) user.profileImage = profileImage;
+        user.dob = dob || user.dob;
+        user.occupation = occupation || user.occupation;
+        user.location = location || user.location;
+        user.education = education || user.education;
+        user.motherTongue = motherTongue || user.motherTongue;
+        user.religion = religion || user.religion;
+        user.caste = caste || user.caste;
+        user.about = about || user.about;
+
+        // Update interests if provided (array of strings)
+        if (interests) {
+            try {
+                const parsedInterests = JSON.parse(interests);
+                if (Array.isArray(parsedInterests)) {
+                    user.interests = parsedInterests;
+                }
+            } catch (error) {
+                // If JSON parsing fails, assume it's already an array or handle differently
+                if (Array.isArray(interests)) {
+                    user.interests = interests;
+                }
+            }
+        }
+
+        // Handle multiple photo uploads
+        if (req.files && req.files.photos) {
+            const photoFiles = Array.isArray(req.files.photos) ? req.files.photos : [req.files.photos];
+            photoFiles.forEach(file => {
+                user.photos.push(file.path);
+            });
+        }
+
+        // Update preferences if provided
+        if (preferences) {
+            try {
+                const parsedPreferences = typeof preferences === 'string' ? JSON.parse(preferences) : preferences;
+                user.preferences = {
+                    ageRange: parsedPreferences.ageRange || user.preferences.ageRange,
+                    height: parsedPreferences.height || user.preferences.height,
+                    maritalStatus: parsedPreferences.maritalStatus || user.preferences.maritalStatus,
+                    religion: parsedPreferences.religion || user.preferences.religion,
+                    education: parsedPreferences.education || user.preferences.education,
+                    profession: parsedPreferences.profession || user.preferences.profession,
+                    location: parsedPreferences.location || user.preferences.location,
+                    diet: parsedPreferences.diet || user.preferences.diet
+                };
+            } catch (error) {
+                console.error('Error parsing preferences:', error);
+                // If JSON parsing fails, keep existing preferences
+            }
+        }
 
         await user.save();
 
+        // Return updated user data with profile completion percentage
         res.status(200).json({
             success: true,
             status: 200,
@@ -345,10 +409,79 @@ export const updateUser = async (req, res) => {
                 name: user.name,
                 email: user.email,
                 phoneNumber: user.phoneNumber,
+                profileFor: user.profileFor,
+                gender: user.gender,
+                dob: user.dob,
+                occupation: user.occupation,
+                location: user.location,
+                education: user.education,
+                motherTongue: user.motherTongue,
+                religion: user.religion,
+                caste: user.caste,
+                about: user.about,
+                interests: user.interests,
+                photos: user.photos,
+                preferences: user.preferences,
                 profileImage: user.profileImage,
+                profileCompletion: user.profileCompletion
             }
         });
     } catch (err) {
+        console.error('Update user error:', err);
+        res.status(500).json({
+            success: false,
+            status: 500,
+            message: 'Server error',
+            error: err.message
+        });
+    }
+};
+
+export const updateProfilePicture = async (req, res) => {
+    const userId = req.user._id;
+
+    if (!req.file) {
+        return res.status(400).json({
+            success: false,
+            status: 400,
+            message: 'Profile image is required'
+        });
+    }
+
+    try {
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                status: 404,
+                message: 'User not found'
+            });
+        }
+
+        // Delete old profile image if exists
+        if (user.profileImage) {
+            const fs = require('fs');
+            const path = require('path');
+            const oldImagePath = path.resolve(user.profileImage);
+            if (fs.existsSync(oldImagePath)) {
+                fs.unlinkSync(oldImagePath);
+            }
+        }
+
+        // Update profile image
+        user.profileImage = req.file.path;
+        await user.save();
+
+        res.status(200).json({
+            success: true,
+            status: 200,
+            message: 'Profile picture updated successfully',
+            data: {
+                profileImage: user.profileImage
+            }
+        });
+    } catch (err) {
+        console.error('Update profile picture error:', err);
         res.status(500).json({
             success: false,
             status: 500,

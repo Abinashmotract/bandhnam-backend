@@ -5,7 +5,8 @@ import {
     refreshAccessToken,
     forgotPassword,
     verifyOtp,
-    resetPassword, getUserDetails, resendOtp, updateUser, logout
+    resetPassword, getUserDetails, resendOtp, updateUser, logout,
+    updateProfilePicture
 } from '../controllers/authController.js';
 import { VerifyToken } from '../middlewares/authMiddleware.js';
 import upload from '../middlewares/upload.js';
@@ -24,7 +25,8 @@ router.post('/reset-password', resetPassword);
 // Protected routes (require authentication)
 router.post('/logout', logout);
 router.get('/user', VerifyToken, getUserDetails);
-router.put('/user/update/:id', VerifyToken, upload.single('profileImage'), updateUser);
+router.put('/user/update', VerifyToken, upload.fields([{ name: 'photos', maxCount: 10 }]), updateUser);
+router.put('/user/profile-picture', VerifyToken, upload.single('profileImage'), updateProfilePicture);
 
 
 export default router;
