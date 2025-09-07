@@ -29,7 +29,7 @@ app.use(express.static('public'));
 const server = http.createServer(app);
 
 const io = new Server(server, {
-  cors: { origin: "http://localhost:5173", }
+  cors: { origin: "https://bandhan-ynnt.onrender.com", }
 });
 
 io.on("connection", (socket) => {
