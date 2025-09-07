@@ -316,7 +316,7 @@ export const getUserDetails = async (req, res) => {
 };
 
 export const updateUser = async (req, res) => {
-    const userId = req.user._id; // Get user ID from authenticated request
+    const userId = req.user._id; 
     const {
         name,
         phoneNumber,
@@ -341,8 +341,6 @@ export const updateUser = async (req, res) => {
                 message: 'User not found'
             });
         }
-
-        // Update basic information
         user.name = name || user.name;
         user.phoneNumber = phoneNumber || user.phoneNumber;
         user.dob = dob || user.dob;
@@ -353,8 +351,6 @@ export const updateUser = async (req, res) => {
         user.religion = religion || user.religion;
         user.caste = caste || user.caste;
         user.about = about || user.about;
-
-        // Update interests if provided (array of strings)
         if (interests) {
             try {
                 const parsedInterests = JSON.parse(interests);
@@ -362,22 +358,17 @@ export const updateUser = async (req, res) => {
                     user.interests = parsedInterests;
                 }
             } catch (error) {
-                // If JSON parsing fails, assume it's already an array or handle differently
                 if (Array.isArray(interests)) {
                     user.interests = interests;
                 }
             }
         }
-
-        // Handle multiple photo uploads
         if (req.files && req.files.photos) {
             const photoFiles = Array.isArray(req.files.photos) ? req.files.photos : [req.files.photos];
             photoFiles.forEach(file => {
                 user.photos.push(file.path);
             });
         }
-
-        // Update preferences if provided
         if (preferences) {
             try {
                 const parsedPreferences = typeof preferences === 'string' ? JSON.parse(preferences) : preferences;
@@ -393,13 +384,9 @@ export const updateUser = async (req, res) => {
                 };
             } catch (error) {
                 console.error('Error parsing preferences:', error);
-                // If JSON parsing fails, keep existing preferences
             }
         }
-
         await user.save();
-
-        // Return updated user data with profile completion percentage
         res.status(200).json({
             success: true,
             status: 200,

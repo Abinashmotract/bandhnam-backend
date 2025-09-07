@@ -28,5 +28,4 @@ router.get('/user', VerifyToken, getUserDetails);
 router.put('/user/update', VerifyToken, upload.fields([{ name: 'photos', maxCount: 10 }]), updateUser);
 router.put('/user/profile-picture', VerifyToken, upload.single('profileImage'), updateProfilePicture);
 
-
 export default router;
