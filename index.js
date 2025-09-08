@@ -1,10 +1,11 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import connectDB from './config/db.js';
-import authRoutes from './routes/authRoutes.js';
 import { Server } from "socket.io";
 import http from 'http';
 import cors from 'cors';
+import authRoutes from './routes/authRoutes.js';
+import profileRoutes from "./routes/profileRoutes.js";
 
 dotenv.config();
 connectDB();
@@ -25,6 +26,8 @@ app.use(express.json());
 
 // 👉 Serve static files from the 'public' directory
 app.use(express.static('public'));
+
+app.use('/uploads', express.static('uploads'));
 
 const server = http.createServer(app);
 
@@ -51,6 +54,7 @@ io.on("connection", (socket) => {
 });
 
 app.use('/api/auth', authRoutes);
+app.use("/api/profiles", profileRoutes);
 
 server.listen(process.env.PORT, () => {
   console.log(`Server running on port ${process.env.PORT}`);

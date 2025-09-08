@@ -1,32 +1,5 @@
+// models/User.js
 import mongoose from 'mongoose';
-
-// const userSchema = new mongoose.Schema({
-//     name: { type: String, required: true },
-//     email: { type: String, required: true, unique: true },
-//     phoneNumber: { type: String, required: true, unique: true },
-//     password: { type: String, required: true },
-//     profileFor: {
-//         type: String,
-//         required: true,
-//         enum: ['self', 'son', 'daughter', 'brother', 'sister', 'relative', 'friend']
-//     },
-//     gender: {
-//         type: String,
-//         required: function () {
-//             return this.profileFor === 'self' || this.profileFor === 'relative' || this.profileFor === 'friend';
-//         },
-//         enum: ['male', 'female', 'other']
-//     },
-//     dob: { type: Date },
-//     occupation: { type: String },
-//     location: { type: String },
-//     otp: { type: String },
-//     otpExpiry: { type: Date },
-//     isOtpVerified: { type: Boolean, default: false },
-//     profileImage: { type: String },
-//     agreeToTerms: { type: Boolean, default: false }
-// }, { timestamps: true });
-// export default mongoose.model('User', userSchema);
 
 const userSchema = new mongoose.Schema({
     name: { type: String, required: true },
@@ -60,10 +33,7 @@ const userSchema = new mongoose.Schema({
             min: { type: Number, default: 25 },
             max: { type: Number, default: 35 }
         },
-        height: {
-            min: { type: Number },
-            max: { type: Number }
-        },
+        height: String,
         maritalStatus: String,
         religion: String,
         education: String,
@@ -79,41 +49,52 @@ const userSchema = new mongoose.Schema({
     agreeToTerms: { type: Boolean, default: false }
 }, { timestamps: true });
 
-/**
- * Fields that contribute to profile completion
- */
+// Fields that contribute to profile completion with their weights
 const completionFields = [
-    "name", "email", "phoneNumber", "profileFor", "gender", "dob",
-    "occupation", "location", "education", "motherTongue", "religion",
-    "caste", "about", "photos"
+    { field: "name", weight: 10 },
+    { field: "email", weight: 5 },
+    { field: "phoneNumber", weight: 5 },
+    { field: "profileFor", weight: 5 },
+    { field: "gender", weight: 5 },
+    { field: "dob", weight: 5 },
+    { field: "occupation", weight: 8 },
+    { field: "location", weight: 8 },
+    { field: "education", weight: 8 },
+    { field: "motherTongue", weight: 5 },
+    { field: "religion", weight: 5 },
+    { field: "caste", weight: 5 },
+    { field: "about", weight: 8 },
+    { field: "interests", weight: 5, check: (user) => user.interests && user.interests.length > 0 },
+    { field: "photos", weight: 8, check: (user) => user.photos && user.photos.length > 0 },
+    { field: "profileImage", weight: 10, check: (user) => !!user.profileImage }
 ];
 
 /**
- * Calculate profile completion
+ * Calculate profile completion percentage
  */
-function calculateProfileCompletion(user) {
-    let completion = 0;
+userSchema.methods.calculateProfileCompletion = function () {
+    let totalWeight = 0;
+    let completedWeight = 0;
 
-    completionFields.forEach((field) => {
-        if (field === "photos") {
-            if (user.photos && user.photos.length > 0) completion++;
-        } else if (user[field]) {
-            completion++;
+    completionFields.forEach(({ field, weight, check }) => {
+        totalWeight += weight;
+        
+        if (check) {
+            if (check(this)) {
+                completedWeight += weight;
+            }
+        } else if (this[field]) {
+            completedWeight += weight;
         }
     });
 
-    return Math.round((completion / completionFields.length) * 100);
-}
+    return Math.round((completedWeight / totalWeight) * 100);
+};
 
-// Pre-save hook
+// Pre-save hook to update profile completion
 userSchema.pre("save", function (next) {
-    this.profileCompletion = calculateProfileCompletion(this);
+    this.profileCompletion = this.calculateProfileCompletion();
     next();
 });
-
-// Expose helper (can be used in controllers too)
-userSchema.methods.calculateProfileCompletion = function () {
-    return calculateProfileCompletion(this);
-};
 
 export default mongoose.model("User", userSchema);
