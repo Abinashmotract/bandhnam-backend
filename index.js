@@ -10,6 +10,7 @@ import contactRoutes from "./routes/contactRoutes.js";
 
 import adminRoutes from "./admin/routes/adminRoutes.js";
 import membershipRoutes from "./admin/routes/membershipRoutes.js";
+import MembershipPlan from "./routes/usersMembershipRoutes.js";
 
 dotenv.config();
 connectDB();
@@ -63,6 +64,7 @@ app.use("/api/admin/membership", membershipRoutes);
 app.use('/api/auth', authRoutes);
 app.use("/api/profiles", profileRoutes);
 app.use("/api/contact", contactRoutes);
+app.use("/api/user/membership", MembershipPlan);
 
 server.listen(process.env.PORT, () => {
   console.log(`Server running on port ${process.env.PORT}`);

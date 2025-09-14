@@ -5,12 +5,13 @@ import {
   updateMembershipPlan,
   deleteMembershipPlan
 } from "../controllers/membershipController.js";
+import { VerifyAdmin } from "../../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
-router.post("/add", createMembershipPlan);
-router.get("/get", getAllMembershipPlans);
-router.put("/update/:id", updateMembershipPlan);
-router.delete("/delete/:id", deleteMembershipPlan);
+router.post("/add", VerifyAdmin, createMembershipPlan);
+router.get("/get", VerifyAdmin, getAllMembershipPlans);
+router.put("/update/:id", VerifyAdmin, updateMembershipPlan);
+router.delete("/delete/:id", VerifyAdmin, deleteMembershipPlan);
 
 export default router;
