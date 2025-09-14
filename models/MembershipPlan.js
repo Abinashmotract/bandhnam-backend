@@ -1,4 +1,3 @@
-// models/MembershipPlan.js
 import mongoose from "mongoose";
 
 const membershipPlanSchema = new mongoose.Schema(
@@ -7,46 +6,40 @@ const membershipPlanSchema = new mongoose.Schema(
       type: String,
       required: true,
       enum: ["Basic", "Premium", "Elite"],
+      unique: false
     },
     price: {
       type: Number,
-      required: true,
+      required: true
     },
     duration: {
       type: String,
-      default: "yearly",
+      required: true,
       enum: ["monthly", "quarterly", "yearly"],
+      default: "monthly"
     },
-    features: [{
-      type: String,
-      required: true
-    }],
+    features: [
+      {
+        type: String,
+        required: true
+      }
+    ],
     description: {
       type: String,
       default: ""
     },
-    isActive: {
-      type: Boolean,
-      default: true
-    },
-    isDefault: {
+    isPopular: {
       type: Boolean,
       default: false
     },
-    createdBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-    //   required: true
-    },
-    order: {
-      type: Number,
-      default: 0
+    isActive: {
+      type: Boolean,
+      default: true
     }
   },
   { timestamps: true }
 );
 
-// Prevent duplicate active plans with same name and duration
 membershipPlanSchema.index({ name: 1, duration: 1, isActive: 1 }, { unique: true });
 
 export default mongoose.model("MembershipPlan", membershipPlanSchema);

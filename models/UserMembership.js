@@ -11,14 +11,6 @@ const userMembershipSchema = new mongoose.Schema({
         ref: 'Membership',
         required: true
     },
-    membershipName: {
-        type: String,
-        required: true
-    },
-    price: {
-        type: Number,
-        required: true
-    },
     startDate: {
         type: Date,
         default: Date.now
@@ -41,8 +33,5 @@ const userMembershipSchema = new mongoose.Schema({
     transactionId: String
 }, { timestamps: true });
 
-// Index for efficient queries
-userMembershipSchema.index({ userId: 1, status: 1 });
-userMembershipSchema.index({ endDate: 1 });
 
 export default mongoose.model('UserMembership', userMembershipSchema);
