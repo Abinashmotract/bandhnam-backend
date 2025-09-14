@@ -184,8 +184,9 @@ export const login = async (req, res) => {
                 message: "Incorrect password",
             });
         }
-        const accessToken = generateAccessToken(user._id);
-        const refreshToken = generateRefreshToken(user._id);
+        const payload = { id: user._id, role: user.role };
+        const accessToken = generateAccessToken(payload);
+        const refreshToken = generateRefreshToken(payload);
         return res.status(200).json({
             success: true,
             statusCode: 200,

@@ -8,6 +8,8 @@ import authRoutes from './routes/authRoutes.js';
 import profileRoutes from "./routes/profileRoutes.js";
 import contactRoutes from "./routes/contactRoutes.js";
 
+import adminRoutes from "./admin/routes/adminRoutes.js";
+
 dotenv.config();
 connectDB();
 
@@ -53,6 +55,8 @@ io.on("connection", (socket) => {
     console.log("Client disconnected:", socket.id);
   });
 });
+
+app.use("/api/admin", adminRoutes);
 
 app.use('/api/auth', authRoutes);
 app.use("/api/profiles", profileRoutes);
