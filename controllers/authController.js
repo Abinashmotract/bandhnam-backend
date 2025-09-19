@@ -1,7 +1,7 @@
 import User from "../models/User.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import {generateAccessToken, generateRefreshToken} from "../utils/generateToken.js";
+import { generateAccessToken, generateRefreshToken } from "../utils/generateToken.js";
 import sendEmail from "../utils/sendEmail.js";
 import nodemailer from "nodemailer";
 import fs from "fs";
@@ -19,79 +19,80 @@ const transporter = nodemailer.createTransport({
     },
 });
 
-export const signup = async (req, res) => {
-    const {
-        name,
-        email,
-        mobile,
-        password,
-        confirmPassword,
-        profileFor,
-        gender,
-        dob,
-        occupation,
-        location,
-        agreeToTerms,
-    } = req.body;
-    if (!name || !email || !mobile || !password || !profileFor) {
-        return res.status(400).json({
-            success: false,
-            status: 400,
-            message: "All required fields must be provided",
-        });
-    }
-    if (password !== confirmPassword) {
-        return res.status(400).json({
-            success: false,
-            status: 400,
-            message: "Passwords do not match",
-        });
-    }
-    if (!agreeToTerms) {
-        return res.status(400).json({
-            success: false,
-            status: 400,
-            message: "You must agree to the terms and conditions",
-        });
-    }
-    if ((profileFor === "self" || profileFor === "relative" || profileFor === "friend") && !gender) {
-        return res.status(400).json({
-            success: false,
-            status: 400,
-            message: "Gender is required for this profile type",
-        });
-    }
-    const phoneRegex = /^[0-9]{10}$/;
-    if (!phoneRegex.test(mobile)) {
-        return res.status(400).json({
-            success: false,
-            status: 400,
-            message: "Phone number must be exactly 10 digits.",
-        });
-    }
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
-    if (!passwordRegex.test(password)) {
-        return res.status(400).json({
-            success: false,
-            status: 400,
-            message:
-                "Password must be at least 8 characters and include one uppercase letter, one lowercase letter, one number, and one special character.",
-        });
-    }
-    try {
-        const userExists = await User.findOne({
-            $or: [{email}, {phoneNumber: mobile}],
-        });
+export const sendWelcomeEmail = async (user) => {
+    const { name, email, phoneNumber, profileFor, gender } = user;
 
-        if (userExists) {
+    const mailOptions = {
+        from: "Kumarsinha2574@gmail.com",
+        to: email,
+        subject: "Welcome to Bandhnam Nammatch!",
+        html: `
+      <h2>Hello ${name},</h2>
+      <p>Thank you for registering with Bandhnam Nammatch - your journey to find the perfect partner begins now!</p>
+      <p><strong>Your registration details:</strong></p>
+      <ul>
+        <li><strong>Name:</strong> ${name}</li>
+        <li><strong>Email:</strong> ${email}</li>
+        <li><strong>Phone:</strong> ${phoneNumber}</li>
+        <li><strong>Profile For:</strong> ${profileFor}</li>
+        ${gender ? `<li><strong>Gender:</strong> ${gender}</li>` : ""}
+      </ul>
+      <p>We're excited to help you find your perfect match. Login to explore profiles and start connecting!</p>
+      <br />
+      <p>Best regards,<br>Bandhnam Nammatch Team</p>
+    `,
+    };
+
+    try {
+        await transporter.sendMail(mailOptions);
+        console.log("Welcome email sent to:", email);
+        return true;
+    } catch (error) {
+        console.error("Error sending welcome email:", error);
+        return false;
+    }
+};
+
+
+export const signup = async (req, res) => {
+    try {
+        const { name, email, mobile, password, confirmPassword, profileFor, gender, dob, state, city, location,
+            religion, caste, subCaste, motherTongue, maritalStatus, highestQualification, fieldOfStudy, occupation,
+            industry, annualIncome, education, height, weight, bodyType, complexion, diet, drinkingHabits, smokingHabits,
+            fitnessLevel, hobbies, interests, languagesKnown, petPreferences, preferences, fatherOccupation, motherOccupation,
+            brothers, brothersMarried, sisters, sistersMarried, familyType, familyIncome, nativePlace, familyStatus, about, photos,
+            profileImage, agreeToTerms, } = req.body;
+        if (!name || !email || !mobile || !password || !profileFor) {
+            return res.status(400).json({ success: false, message: "All required fields must be provided" });
+        }
+        if (password !== confirmPassword) {
+            return res.status(400).json({ success: false, message: "Passwords do not match" });
+        }
+        if (!agreeToTerms) {
+            return res.status(400).json({ success: false, message: "You must agree to the terms and conditions" });
+        }
+        const phoneRegex = /^[0-9]{10}$/;
+        if (!phoneRegex.test(mobile)) {
+            return res.status(400).json({ success: false, message: "Phone number must be exactly 10 digits" });
+        }
+        const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
+        if (!passwordRegex.test(password)) {
             return res.status(400).json({
                 success: false,
-                status: 400,
-                message: "User with this email or phone number already exists",
+                message:
+                    "Password must be at least 8 characters and include one uppercase letter, one lowercase letter, one number, and one special character.",
             });
         }
-
+        // --- Check if user exists ---
+        const userExists = await User.findOne({
+            $or: [{ email }, { phoneNumber: mobile }],
+        });
+        if (userExists) {
+            return res.status(400).json({ success: false, message: "User with this email or phone number already exists" });
+        }
+        // --- Hash password ---
         const hashed = await bcrypt.hash(password, 10);
+        // --- Auto gender fill ---
         let finalGender = gender;
         if (!finalGender) {
             if (profileFor === "son" || profileFor === "brother") {
@@ -100,62 +101,30 @@ export const signup = async (req, res) => {
                 finalGender = "female";
             }
         }
+        // --- Create User ---
         const user = await User.create({
-            name,
-            email,
-            phoneNumber: mobile,
-            password: hashed,
-            profileFor,
-            gender: finalGender,
-            dob,
-            occupation,
-            location,
+            name, email, phoneNumber: mobile, password: hashed, profileFor, gender: finalGender, dob,
+            state, city, location, religion, caste, subCaste, motherTongue, maritalStatus, highestQualification, fieldOfStudy,
+            occupation, industry, annualIncome, education, height, weight, bodyType, complexion, diet, drinkingHabits, smokingHabits,
+            fitnessLevel, hobbies, interests, languagesKnown, petPreferences, preferences, fatherOccupation, motherOccupation, brothers,
+            brothersMarried, sisters, sistersMarried, familyType, familyIncome, nativePlace, familyStatus, about, photos, profileImage,
             agreeToTerms,
         });
-        const mailOptions = {
-            from: "Kumarsinha2574@gmail.com",
-            to: email,
-            subject: "Welcome to Bandhnam Nammatch!",
-            html: `
-                <h2>Hello ${name},</h2>
-                <p>Thank you for registering with Bandhnam Nammatch - your journey to find the perfect partner begins now!</p>
-                <p><strong>Your registration details:</strong></p>
-                <ul>
-                    <li><strong>Name:</strong> ${name}</li>
-                    <li><strong>Email:</strong> ${email}</li>
-                    <li><strong>Phone:</strong> ${mobile}</li>
-                    <li><strong>Profile For:</strong> ${profileFor}</li>
-                    ${finalGender ? `<li><strong>Gender:</strong> ${finalGender}</li>` : ""}
-                </ul>
-                <p>We're excited to help you find your perfect match. Login to explore profiles and start connecting!</p>
-                <br />
-                <p>Best regards,<br>Bandhnam Nammatch Team</p>
-            `,
-        };
-        transporter.sendMail(mailOptions, (error, info) => {
-            if (error) {
-                console.error("Error sending mail:", error);
-            } else {
-                console.log("Email sent:", info.response);
-            }
-        });
+        // --- Send Welcome Email ---
+        await sendWelcomeEmail(user);
         return res.status(201).json({
             success: true,
-            status: 201,
             message: "User registered successfully. Welcome email sent.",
+            data: { id: user._id, email: user.email, profileCompletion: user.profileCompletion },
         });
     } catch (err) {
-        return res.status(500).json({
-            success: false,
-            status: 500,
-            message: "Server error",
-            error: err.message,
-        });
+        console.error("Signup error:", err);
+        return res.status(500).json({ success: false, message: "Server error", error: err.message });
     }
 };
 
 export const login = async (req, res) => {
-    const {identifier, email, password} = req.body;
+    const { identifier, email, password } = req.body;
     const loginId = identifier || email;
     if (!loginId || !password) {
         return res.status(400).json({
@@ -166,7 +135,7 @@ export const login = async (req, res) => {
     }
     try {
         const user = await User.findOne({
-            $or: [{email: loginId}, {phoneNumber: loginId}],
+            $or: [{ email: loginId }, { phoneNumber: loginId }],
         });
 
         if (!user) {
@@ -208,7 +177,7 @@ export const login = async (req, res) => {
 };
 
 export const refreshAccessToken = async (req, res) => {
-    const {refreshToken} = req.body;
+    const { refreshToken } = req.body;
 
     if (!refreshToken) {
         return res.status(401).json({
@@ -266,7 +235,7 @@ export const refreshAccessToken = async (req, res) => {
 
 export const logout = async (req, res) => {
     try {
-        const {refreshToken} = req.body;
+        const { refreshToken } = req.body;
         res.clearCookie("accessToken");
         res.clearCookie("refreshToken");
         res.status(200).json({
@@ -452,7 +421,7 @@ export const updateProfilePicture = async (req, res) => {
 };
 
 export const forgotPassword = async (req, res) => {
-    const {email} = req.body;
+    const { email } = req.body;
     if (!email) {
         return res.status(400).json({
             success: false,
@@ -461,7 +430,7 @@ export const forgotPassword = async (req, res) => {
         });
     }
     try {
-        const user = await User.findOne({email});
+        const user = await User.findOne({ email });
         if (!user) {
             return res.status(200).json({
                 success: true,
@@ -508,21 +477,21 @@ export const forgotPassword = async (req, res) => {
 
 // -------------------- RESEND OTP --------------------
 export const resendOtp = async (req, res) => {
-    const {email} = req.body;
-    if (!email) return res.status(400).json({success: false, status: 400, message: "Email is required"});
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ success: false, status: 400, message: "Email is required" });
 
     try {
-        const user = await User.findOne({email});
+        const user = await User.findOne({ email });
         if (!user)
             return res
-            .status(200)
-            .json({success: true, status: 200, message: "If the email exists, a new OTP has been sent"});
+                .status(200)
+                .json({ success: true, status: 200, message: "If the email exists, a new OTP has been sent" });
 
         if (user.otpExpiry > Date.now() && user.otp) {
             const minutesLeft = Math.ceil((user.otpExpiry - Date.now()) / 1000 / 60);
             return res
-            .status(429)
-            .json({success: false, status: 429, message: `Wait ${minutesLeft} min before requesting new OTP`});
+                .status(429)
+                .json({ success: false, status: 429, message: `Wait ${minutesLeft} min before requesting new OTP` });
         }
 
         const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -546,32 +515,32 @@ export const resendOtp = async (req, res) => {
         `;
         await sendEmail(email, "New OTP for Password Reset - Bandhnam Nammatch", html);
 
-        res.status(200).json({success: true, status: 200, message: "New OTP sent successfully"});
+        res.status(200).json({ success: true, status: 200, message: "New OTP sent successfully" });
     } catch (err) {
         console.error("Resend OTP error:", err);
-        res.status(500).json({success: false, status: 500, message: "Server error", error: err.message});
+        res.status(500).json({ success: false, status: 500, message: "Server error", error: err.message });
     }
 };
 
 // -------------------- VERIFY OTP --------------------
 export const verifyOtp = async (req, res) => {
-    const {email, otp} = req.body;
+    const { email, otp } = req.body;
     if (!email || !otp)
-        return res.status(400).json({success: false, status: 400, message: "Email and OTP are required"});
+        return res.status(400).json({ success: false, status: 400, message: "Email and OTP are required" });
 
     try {
-        const user = await User.findOne({email});
+        const user = await User.findOne({ email });
         if (!user || user.otp !== otp || user.otpExpiry < Date.now()) {
-            return res.status(400).json({success: false, status: 400, message: "Invalid or expired OTP"});
+            return res.status(400).json({ success: false, status: 400, message: "Invalid or expired OTP" });
         }
 
         user.isOtpVerified = true;
         await user.save();
 
         const resetToken = jwt.sign(
-            {userId: user._id, purpose: "password_reset"},
+            { userId: user._id, purpose: "password_reset" },
             process.env.JWT_SECRET || "your-secret-key",
-            {expiresIn: "15m"}
+            { expiresIn: "15m" }
         );
 
         // Optional: send confirmation email that OTP verified
@@ -590,46 +559,46 @@ export const verifyOtp = async (req, res) => {
             success: true,
             status: 200,
             message: "OTP verified successfully",
-            data: {resetToken, email: user.email},
+            data: { resetToken, email: user.email },
         });
     } catch (err) {
         console.error("Verify OTP error:", err);
-        res.status(500).json({success: false, status: 500, message: "Server error", error: err.message});
+        res.status(500).json({ success: false, status: 500, message: "Server error", error: err.message });
     }
 };
 
 // -------------------- RESET PASSWORD --------------------
 export const resetPassword = async (req, res) => {
-    const {email, newPassword, confirmPassword, resetToken} = req.body;
+    const { email, newPassword, confirmPassword, resetToken } = req.body;
     if (!email || !newPassword || !confirmPassword)
         return res
-        .status(400)
-        .json({success: false, status: 400, message: "Email, new password and confirmation are required"});
+            .status(400)
+            .json({ success: false, status: 400, message: "Email, new password and confirmation are required" });
     if (newPassword !== confirmPassword)
-        return res.status(400).json({success: false, status: 400, message: "Passwords do not match"});
+        return res.status(400).json({ success: false, status: 400, message: "Passwords do not match" });
 
     const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
     if (!passwordRegex.test(newPassword))
         return res
-        .status(400)
-        .json({success: false, status: 400, message: "Password must meet complexity requirements"});
+            .status(400)
+            .json({ success: false, status: 400, message: "Password must meet complexity requirements" });
 
     try {
-        const user = await User.findOne({email});
-        if (!user) return res.status(404).json({success: false, status: 404, message: "User not found"});
+        const user = await User.findOne({ email });
+        if (!user) return res.status(404).json({ success: false, status: 404, message: "User not found" });
 
         if (!user.isOtpVerified)
-            return res.status(403).json({success: false, status: 403, message: "OTP not verified"});
+            return res.status(403).json({ success: false, status: 403, message: "OTP not verified" });
 
         // Verify reset token
         if (resetToken) {
             try {
                 const decoded = jwt.verify(resetToken, process.env.JWT_SECRET || "your-secret-key");
                 if (decoded.userId !== user._id.toString() || decoded.purpose !== "password_reset") {
-                    return res.status(403).json({success: false, status: 403, message: "Invalid reset token"});
+                    return res.status(403).json({ success: false, status: 403, message: "Invalid reset token" });
                 }
             } catch {
-                return res.status(403).json({success: false, status: 403, message: "Invalid or expired reset token"});
+                return res.status(403).json({ success: false, status: 403, message: "Invalid or expired reset token" });
             }
         }
 
@@ -651,9 +620,9 @@ export const resetPassword = async (req, res) => {
         `;
         await sendEmail(email, "Password Reset Successful - Bandhnam Nammatch", html);
 
-        res.status(200).json({success: true, status: 200, message: "Password reset successful"});
+        res.status(200).json({ success: true, status: 200, message: "Password reset successful" });
     } catch (err) {
         console.error("Reset password error:", err);
-        res.status(500).json({success: false, status: 500, message: "Server error", error: err.message});
+        res.status(500).json({ success: false, status: 500, message: "Server error", error: err.message });
     }
 };
