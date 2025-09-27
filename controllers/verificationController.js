@@ -1,16 +1,8 @@
 import Verification from "../models/Verification.js";
 import User from "../models/User.js";
 import jwt from "jsonwebtoken";
-import { sendEmail } from "../utils/sendEmail.js";
+import sendEmail from "../utils/sendEmail.js";
 import nodemailer from "nodemailer";
-
-const transporter = nodemailer.createTransporter({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER || "kumarsinha2574@gmail.com",
-    pass: process.env.EMAIL_PASS || "tsod jopw zhbe qklp",
-  },
-});
 
 // Send email verification
 export const sendEmailVerification = async (req, res) => {
