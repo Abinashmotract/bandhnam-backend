@@ -1,0 +1,493 @@
+{
+  "api_endpoints": {
+    "base_url": "http://localhost:5000/api",
+    "authentication": {
+      "signup": {
+        "method": "POST",
+        "endpoint": "/auth/signup",
+        "description": "Create new user account",
+        "curl": "curl -X POST http://localhost:5000/api/auth/signup -H \"Content-Type: application/json\" -d '{\"name\": \"John Doe\", \"email\": \"john@example.com\", \"mobile\": \"9876543210\", \"password\": \"Password123!\", \"confirmPassword\": \"Password123!\", \"profileFor\": \"self\", \"gender\": \"male\", \"agreeToTerms\": true}'",
+        "requires_auth": false
+      },
+      "login": {
+        "method": "POST",
+        "endpoint": "/auth/login",
+        "description": "Login with email/phone + password",
+        "curl": "curl -X POST http://localhost:5000/api/auth/login -H \"Content-Type: application/json\" -d '{\"identifier\": \"john@example.com\", \"password\": \"Password123!\"}'",
+        "requires_auth": false
+      },
+      "logout": {
+        "method": "POST",
+        "endpoint": "/auth/logout",
+        "description": "Logout and invalidate token",
+        "curl": "curl -X POST http://localhost:5000/api/auth/logout -H \"Authorization: Bearer <token>\" -H \"Content-Type: application/json\"",
+        "requires_auth": true
+      },
+      "refresh_token": {
+        "method": "POST",
+        "endpoint": "/auth/refresh-token",
+        "description": "Refresh JWT token",
+        "curl": "curl -X POST http://localhost:5000/api/auth/refresh-token -H \"Content-Type: application/json\" -d '{\"refreshToken\": \"<refresh-token>\"}'",
+        "requires_auth": false
+      },
+      "forgot_password": {
+        "method": "POST",
+        "endpoint": "/auth/forgot-password",
+        "description": "Reset password",
+        "curl": "curl -X POST http://localhost:5000/api/auth/forgot-password -H \"Content-Type: application/json\" -d '{\"email\": \"john@example.com\"}'",
+        "requires_auth": false
+      },
+      "verify_otp": {
+        "method": "POST",
+        "endpoint": "/auth/verify-otp",
+        "description": "Verify OTP",
+        "curl": "curl -X POST http://localhost:5000/api/auth/verify-otp -H \"Content-Type: application/json\" -d '{\"email\": \"john@example.com\", \"otp\": \"123456\"}'",
+        "requires_auth": false
+      },
+      "reset_password": {
+        "method": "POST",
+        "endpoint": "/auth/reset-password",
+        "description": "Reset password with token",
+        "curl": "curl -X POST http://localhost:5000/api/auth/reset-password -H \"Content-Type: application/json\" -d '{\"email\": \"john@example.com\", \"newPassword\": \"NewPassword123!\", \"confirmPassword\": \"NewPassword123!\", \"resetToken\": \"<reset-token>\"}'",
+        "requires_auth": false
+      }
+    },
+    "profile_management": {
+      "get_all_profiles": {
+        "method": "GET",
+        "endpoint": "/profiles/list",
+        "description": "Get all profiles",
+        "curl": "curl -X GET http://localhost:5000/api/profiles/list -H \"Authorization: Bearer <token>\"",
+        "requires_auth": true
+      },
+      "get_matches": {
+        "method": "GET",
+        "endpoint": "/profiles/matches",
+        "description": "Get recommended matches",
+        "curl": "curl -X GET http://localhost:5000/api/profiles/matches -H \"Authorization: Bearer <token>\"",
+        "requires_auth": true
+      },
+      "filter_profiles": {
+        "method": "GET",
+        "endpoint": "/profiles/filter",
+        "description": "Filter profiles with query parameters",
+        "curl": "curl -X GET \"http://localhost:5000/api/profiles/filter?ageMin=25&ageMax=35&gender=female&religion=hindu\" -H \"Authorization: Bearer <token>\"",
+        "requires_auth": true
+      },
+      "get_user_details": {
+        "method": "GET",
+        "endpoint": "/auth/user",
+        "description": "Get current user details",
+        "curl": "curl -X GET http://localhost:5000/api/auth/user -H \"Authorization: Bearer <token>\"",
+        "requires_auth": true
+      },
+      "update_user": {
+        "method": "PUT",
+        "endpoint": "/auth/user/update",
+        "description": "Update user profile",
+        "curl": "curl -X PUT http://localhost:5000/api/auth/user/update -H \"Authorization: Bearer <token>\" -H \"Content-Type: application/json\" -d '{\"name\": \"John Doe Updated\", \"occupation\": \"Software Engineer\", \"location\": \"Mumbai\", \"about\": \"Looking for a life partner\"}'",
+        "requires_auth": true
+      },
+      "update_profile_picture": {
+        "method": "PUT",
+        "endpoint": "/auth/user/profile-picture",
+        "description": "Update profile picture",
+        "curl": "curl -X PUT http://localhost:5000/api/auth/user/profile-picture -H \"Authorization: Bearer <token>\" -F \"profileImage=@/path/to/image.jpg\"",
+        "requires_auth": true
+      }
+    },
+    "search_matching": {
+      "search_profiles": {
+        "method": "GET",
+        "endpoint": "/search",
+        "description": "Advanced search with filters",
+        "curl": "curl -X GET \"http://localhost:5000/api/search?ageMin=25&ageMax=35&gender=female&religion=hindu&caste=brahmin&education=graduate&location=mumbai&latitude=19.0760&longitude=72.8777&radius=50&page=1&limit=20\" -H \"Authorization: Bearer <token>\"",
+        "requires_auth": true
+      },
+      "get_recommendations": {
+        "method": "GET",
+        "endpoint": "/search/recommendations",
+        "description": "Get recommended matches",
+        "curl": "curl -X GET \"http://localhost:5000/api/search/recommendations?limit=20\" -H \"Authorization: Bearer <token>\"",
+        "requires_auth": true
+      },
+      "save_search_filter": {
+        "method": "POST",
+        "endpoint": "/search/save",
+        "description": "Save search filter",
+        "curl": "curl -X POST http://localhost:5000/api/search/save -H \"Authorization: Bearer <token>\" -H \"Content-Type: application/json\" -d '{\"name\": \"My Search Filter\", \"filters\": {\"ageRange\": {\"min\": 25, \"max\": 35}, \"gender\": [\"female\"], \"religion\": [\"hindu\"], \"location\": [\"mumbai\"]}}'",
+        "requires_auth": true
+      },
+      "get_saved_filters": {
+        "method": "GET",
+        "endpoint": "/search/saved",
+        "description": "Get saved search filters",
+        "curl": "curl -X GET http://localhost:5000/api/search/saved -H \"Authorization: Bearer <token>\"",
+        "requires_auth": true
+      },
+      "delete_saved_filter": {
+        "method": "DELETE",
+        "endpoint": "/search/saved/:filterId",
+        "description": "Delete saved search filter",
+        "curl": "curl -X DELETE http://localhost:5000/api/search/saved/64f8a1b2c3d4e5f6a7b8c9d0 -H \"Authorization: Bearer <token>\"",
+        "requires_auth": true
+      }
+    },
+    "interactions": {
+      "like_profile": {
+        "method": "POST",
+        "endpoint": "/interactions/like/:userId",
+        "description": "Like a profile",
+        "curl": "curl -X POST http://localhost:5000/api/interactions/like/64f8a1b2c3d4e5f6a7b8c9d0 -H \"Authorization: Bearer <token>\"",
+        "requires_auth": true
+      },
+      "superlike_profile": {
+        "method": "POST",
+        "endpoint": "/interactions/superlike/:userId",
+        "description": "Super like a profile",
+        "curl": "curl -X POST http://localhost:5000/api/interactions/superlike/64f8a1b2c3d4e5f6a7b8c9d0 -H \"Authorization: Bearer <token>\"",
+        "requires_auth": true
+      },
+      "add_to_favourites": {
+        "method": "POST",
+        "endpoint": "/interactions/favourite/:userId",
+        "description": "Add to favourites",
+        "curl": "curl -X POST http://localhost:5000/api/interactions/favourite/64f8a1b2c3d4e5f6a7b8c9d0 -H \"Authorization: Bearer <token>\"",
+        "requires_auth": true
+      },
+      "remove_from_favourites": {
+        "method": "DELETE",
+        "endpoint": "/interactions/favourite/:userId",
+        "description": "Remove from favourites",
+        "curl": "curl -X DELETE http://localhost:5000/api/interactions/favourite/64f8a1b2c3d4e5f6a7b8c9d0 -H \"Authorization: Bearer <token>\"",
+        "requires_auth": true
+      },
+      "block_user": {
+        "method": "POST",
+        "endpoint": "/interactions/block/:userId",
+        "description": "Block a user",
+        "curl": "curl -X POST http://localhost:5000/api/interactions/block/64f8a1b2c3d4e5f6a7b8c9d0 -H \"Authorization: Bearer <token>\"",
+        "requires_auth": true
+      },
+      "unblock_user": {
+        "method": "DELETE",
+        "endpoint": "/interactions/block/:userId",
+        "description": "Unblock a user",
+        "curl": "curl -X DELETE http://localhost:5000/api/interactions/block/64f8a1b2c3d4e5f6a7b8c9d0 -H \"Authorization: Bearer <token>\"",
+        "requires_auth": true
+      },
+      "report_user": {
+        "method": "POST",
+        "endpoint": "/interactions/report/:userId",
+        "description": "Report a user",
+        "curl": "curl -X POST http://localhost:5000/api/interactions/report/64f8a1b2c3d4e5f6a7b8c9d0 -H \"Authorization: Bearer <token>\" -H \"Content-Type: application/json\" -d '{\"reportReason\": \"inappropriate_content\", \"reportDescription\": \"User posted inappropriate content\"}'",
+        "requires_auth": true
+      },
+      "get_interaction_history": {
+        "method": "GET",
+        "endpoint": "/interactions/history",
+        "description": "Get interaction history",
+        "curl": "curl -X GET \"http://localhost:5000/api/interactions/history?type=like&page=1&limit=20\" -H \"Authorization: Bearer <token>\"",
+        "requires_auth": true
+      },
+      "get_profile_views": {
+        "method": "GET",
+        "endpoint": "/interactions/views",
+        "description": "Get who viewed my profile",
+        "curl": "curl -X GET \"http://localhost:5000/api/interactions/views?page=1&limit=20\" -H \"Authorization: Bearer <token>\"",
+        "requires_auth": true
+      },
+      "get_favourites": {
+        "method": "GET",
+        "endpoint": "/interactions/favourites",
+        "description": "Get favourites list",
+        "curl": "curl -X GET \"http://localhost:5000/api/interactions/favourites?page=1&limit=20\" -H \"Authorization: Bearer <token>\"",
+        "requires_auth": true
+      }
+    },
+    "messaging": {
+      "send_message": {
+        "method": "POST",
+        "endpoint": "/chat/:userId",
+        "description": "Send message to a user",
+        "curl": "curl -X POST http://localhost:5000/api/chat/64f8a1b2c3d4e5f6a7b8c9d0 -H \"Authorization: Bearer <token>\" -H \"Content-Type: application/json\" -d '{\"content\": \"Hello! How are you?\", \"messageType\": \"text\"}'",
+        "requires_auth": true
+      },
+      "get_chat_history": {
+        "method": "GET",
+        "endpoint": "/chat/:userId",
+        "description": "Get chat history with a user",
+        "curl": "curl -X GET \"http://localhost:5000/api/chat/64f8a1b2c3d4e5f6a7b8c9d0?page=1&limit=50\" -H \"Authorization: Bearer <token>\"",
+        "requires_auth": true
+      },
+      "get_chat_rooms": {
+        "method": "GET",
+        "endpoint": "/chat",
+        "description": "Get all chat rooms",
+        "curl": "curl -X GET \"http://localhost:5000/api/chat?page=1&limit=20\" -H \"Authorization: Bearer <token>\"",
+        "requires_auth": true
+      },
+      "mark_messages_read": {
+        "method": "POST",
+        "endpoint": "/chat/:userId/read",
+        "description": "Mark messages as read",
+        "curl": "curl -X POST http://localhost:5000/api/chat/64f8a1b2c3d4e5f6a7b8c9d0/read -H \"Authorization: Bearer <token>\"",
+        "requires_auth": true
+      },
+      "delete_message": {
+        "method": "DELETE",
+        "endpoint": "/chat/message/:messageId",
+        "description": "Delete a message",
+        "curl": "curl -X DELETE http://localhost:5000/api/chat/message/64f8a1b2c3d4e5f6a7b8c9d0 -H \"Authorization: Bearer <token>\"",
+        "requires_auth": true
+      },
+      "add_message_reaction": {
+        "method": "POST",
+        "endpoint": "/chat/message/:messageId/reaction",
+        "description": "Add reaction to message",
+        "curl": "curl -X POST http://localhost:5000/api/chat/message/64f8a1b2c3d4e5f6a7b8c9d0/reaction -H \"Authorization: Bearer <token>\" -H \"Content-Type: application/json\" -d '{\"emoji\": \"❤️\"}'",
+        "requires_auth": true
+      },
+      "get_typing_status": {
+        "method": "GET",
+        "endpoint": "/chat/:userId/typing",
+        "description": "Get typing status",
+        "curl": "curl -X GET http://localhost:5000/api/chat/64f8a1b2c3d4e5f6a7b8c9d0/typing -H \"Authorization: Bearer <token>\"",
+        "requires_auth": true
+      }
+    },
+    "subscription_payments": {
+      "get_plans": {
+        "method": "GET",
+        "endpoint": "/user/membership/plans",
+        "description": "Get available subscription plans",
+        "curl": "curl -X GET \"http://localhost:5000/api/user/membership/plans?duration=yearly\" -H \"Authorization: Bearer <token>\"",
+        "requires_auth": true
+      },
+      "subscribe": {
+        "method": "POST",
+        "endpoint": "/user/membership/subscribe",
+        "description": "Subscribe to a plan",
+        "curl": "curl -X POST http://localhost:5000/api/user/membership/subscribe -H \"Authorization: Bearer <token>\" -H \"Content-Type: application/json\" -d '{\"planId\": \"64f8a1b2c3d4e5f6a7b8c9d0\"}'",
+        "requires_auth": true
+      },
+      "webhook": {
+        "method": "POST",
+        "endpoint": "/user/membership/webhook",
+        "description": "Stripe webhook for payment events",
+        "curl": "curl -X POST http://localhost:5000/api/user/membership/webhook -H \"Content-Type: application/json\" -d '<stripe-webhook-payload>'",
+        "requires_auth": false
+      },
+      "check_status": {
+        "method": "GET",
+        "endpoint": "/user/membership/status",
+        "description": "Check subscription status",
+        "curl": "curl -X GET http://localhost:5000/api/user/membership/status -H \"Authorization: Bearer <token>\"",
+        "requires_auth": true
+      },
+      "cancel_subscription": {
+        "method": "POST",
+        "endpoint": "/user/membership/cancel",
+        "description": "Cancel subscription",
+        "curl": "curl -X POST http://localhost:5000/api/user/membership/cancel -H \"Authorization: Bearer <token>\"",
+        "requires_auth": true
+      }
+    },
+    "verification": {
+      "send_email_verification": {
+        "method": "POST",
+        "endpoint": "/verify/email",
+        "description": "Send email verification",
+        "curl": "curl -X POST http://localhost:5000/api/verify/email -H \"Authorization: Bearer <token>\"",
+        "requires_auth": true
+      },
+      "confirm_email_verification": {
+        "method": "GET",
+        "endpoint": "/verify/email/confirm",
+        "description": "Confirm email verification",
+        "curl": "curl -X GET \"http://localhost:5000/api/verify/email/confirm?token=<verification-token>\"",
+        "requires_auth": false
+      },
+      "send_phone_verification": {
+        "method": "POST",
+        "endpoint": "/verify/phone",
+        "description": "Send phone OTP",
+        "curl": "curl -X POST http://localhost:5000/api/verify/phone -H \"Authorization: Bearer <token>\" -H \"Content-Type: application/json\" -d '{\"phoneNumber\": \"9876543210\"}'",
+        "requires_auth": true
+      },
+      "confirm_phone_verification": {
+        "method": "POST",
+        "endpoint": "/verify/phone/confirm",
+        "description": "Confirm phone verification",
+        "curl": "curl -X POST http://localhost:5000/api/verify/phone/confirm -H \"Authorization: Bearer <token>\" -H \"Content-Type: application/json\" -d '{\"otp\": \"123456\"}'",
+        "requires_auth": true
+      },
+      "upload_id_verification": {
+        "method": "POST",
+        "endpoint": "/verify/id",
+        "description": "Upload government ID for verification",
+        "curl": "curl -X POST http://localhost:5000/api/verify/id -H \"Authorization: Bearer <token>\" -F \"frontImage=@/path/to/id-front.jpg\" -F \"backImage=@/path/to/id-back.jpg\" -F \"documentType=aadhar\" -F \"documentNumber=123456789012\"",
+        "requires_auth": true
+      },
+      "upload_verification_photos": {
+        "method": "POST",
+        "endpoint": "/verify/photo",
+        "description": "Upload verification photos",
+        "curl": "curl -X POST http://localhost:5000/api/verify/photo -H \"Authorization: Bearer <token>\" -F \"photos=@/path/to/photo1.jpg\" -F \"photos=@/path/to/photo2.jpg\"",
+        "requires_auth": true
+      },
+      "get_verification_status": {
+        "method": "GET",
+        "endpoint": "/verify/status",
+        "description": "Get verification status",
+        "curl": "curl -X GET http://localhost:5000/api/verify/status -H \"Authorization: Bearer <token>\"",
+        "requires_auth": true
+      }
+    },
+    "notifications": {
+      "get_notifications": {
+        "method": "GET",
+        "endpoint": "/notifications",
+        "description": "Get user notifications",
+        "curl": "curl -X GET \"http://localhost:5000/api/notifications?page=1&limit=20&type=like&isRead=false\" -H \"Authorization: Bearer <token>\"",
+        "requires_auth": true
+      },
+      "mark_notification_read": {
+        "method": "POST",
+        "endpoint": "/notifications/read/:notificationId",
+        "description": "Mark notification as read",
+        "curl": "curl -X POST http://localhost:5000/api/notifications/read/64f8a1b2c3d4e5f6a7b8c9d0 -H \"Authorization: Bearer <token>\"",
+        "requires_auth": true
+      },
+      "mark_all_notifications_read": {
+        "method": "POST",
+        "endpoint": "/notifications/read-all",
+        "description": "Mark all notifications as read",
+        "curl": "curl -X POST http://localhost:5000/api/notifications/read-all -H \"Authorization: Bearer <token>\"",
+        "requires_auth": true
+      },
+      "delete_notification": {
+        "method": "DELETE",
+        "endpoint": "/notifications/:notificationId",
+        "description": "Delete notification",
+        "curl": "curl -X DELETE http://localhost:5000/api/notifications/64f8a1b2c3d4e5f6a7b8c9d0 -H \"Authorization: Bearer <token>\"",
+        "requires_auth": true
+      },
+      "delete_all_notifications": {
+        "method": "DELETE",
+        "endpoint": "/notifications",
+        "description": "Delete all notifications",
+        "curl": "curl -X DELETE http://localhost:5000/api/notifications -H \"Authorization: Bearer <token>\"",
+        "requires_auth": true
+      }
+    },
+    "admin_panel": {
+      "get_all_users": {
+        "method": "GET",
+        "endpoint": "/admin/panel/users",
+        "description": "List all users with filters",
+        "curl": "curl -X GET \"http://localhost:5000/api/admin/panel/users?page=1&limit=20&search=john&role=user&isEmailVerified=true\" -H \"Authorization: Bearer <admin-token>\"",
+        "requires_auth": true,
+        "requires_admin": true
+      },
+      "get_user_details": {
+        "method": "GET",
+        "endpoint": "/admin/panel/users/:userId",
+        "description": "Get specific user details",
+        "curl": "curl -X GET http://localhost:5000/api/admin/panel/users/64f8a1b2c3d4e5f6a7b8c9d0 -H \"Authorization: Bearer <admin-token>\"",
+        "requires_auth": true,
+        "requires_admin": true
+      },
+      "update_user": {
+        "method": "PUT",
+        "endpoint": "/admin/panel/users/:userId",
+        "description": "Update user (ban, suspend, verify, etc.)",
+        "curl": "curl -X PUT http://localhost:5000/api/admin/panel/users/64f8a1b2c3d4e5f6a7b8c9d0 -H \"Authorization: Bearer <admin-token>\" -H \"Content-Type: application/json\" -d '{\"isActive\": false, \"banReason\": \"Inappropriate behavior\", \"notes\": \"User reported multiple times\"}'",
+        "requires_auth": true,
+        "requires_admin": true
+      },
+      "delete_user": {
+        "method": "DELETE",
+        "endpoint": "/admin/panel/users/:userId",
+        "description": "Delete user",
+        "curl": "curl -X DELETE http://localhost:5000/api/admin/panel/users/64f8a1b2c3d4e5f6a7b8c9d0 -H \"Authorization: Bearer <admin-token>\"",
+        "requires_auth": true,
+        "requires_admin": true
+      },
+      "get_reports": {
+        "method": "GET",
+        "endpoint": "/admin/panel/reports",
+        "description": "View reported users/content",
+        "curl": "curl -X GET \"http://localhost:5000/api/admin/panel/reports?page=1&limit=20&status=pending\" -H \"Authorization: Bearer <admin-token>\"",
+        "requires_auth": true,
+        "requires_admin": true
+      },
+      "resolve_report": {
+        "method": "PUT",
+        "endpoint": "/admin/panel/reports/:reportId/resolve",
+        "description": "Resolve a report",
+        "curl": "curl -X PUT http://localhost:5000/api/admin/panel/reports/64f8a1b2c3d4e5f6a7b8c9d0/resolve -H \"Authorization: Bearer <admin-token>\" -H \"Content-Type: application/json\" -d '{\"status\": \"resolved\", \"resolutionNotes\": \"User warned and content removed\"}'",
+        "requires_auth": true,
+        "requires_admin": true
+      },
+      "get_analytics": {
+        "method": "GET",
+        "endpoint": "/admin/panel/analytics",
+        "description": "Platform analytics",
+        "curl": "curl -X GET \"http://localhost:5000/api/admin/panel/analytics?startDate=2024-01-01&endDate=2024-12-31\" -H \"Authorization: Bearer <admin-token>\"",
+        "requires_auth": true,
+        "requires_admin": true
+      },
+      "get_dashboard": {
+        "method": "GET",
+        "endpoint": "/admin/panel/dashboard",
+        "description": "Dashboard statistics",
+        "curl": "curl -X GET http://localhost:5000/api/admin/panel/dashboard -H \"Authorization: Bearer <admin-token>\"",
+        "requires_auth": true,
+        "requires_admin": true
+      },
+      "send_system_notification": {
+        "method": "POST",
+        "endpoint": "/admin/panel/notifications",
+        "description": "Send system-wide notification",
+        "curl": "curl -X POST http://localhost:5000/api/admin/panel/notifications -H \"Authorization: Bearer <admin-token>\" -H \"Content-Type: application/json\" -d '{\"title\": \"System Maintenance\", \"message\": \"The site will be under maintenance from 2-4 AM\", \"type\": \"system\", \"priority\": \"medium\", \"targetUsers\": \"all\"}'",
+        "requires_auth": true,
+        "requires_admin": true
+      }
+    },
+    "system_security": {
+      "health_check": {
+        "method": "GET",
+        "endpoint": "/health",
+        "description": "Health check endpoint",
+        "curl": "curl -X GET http://localhost:5000/health",
+        "requires_auth": false
+      }
+    }
+  },
+  "rate_limiting": {
+    "general": "100 requests per 15 minutes",
+    "auth": "5 requests per 15 minutes",
+    "otp": "3 requests per 5 minutes",
+    "search": "30 requests per minute",
+    "messaging": "20 requests per minute",
+    "admin": "50 requests per 5 minutes"
+  },
+  "response_format": {
+    "success": {
+      "success": true,
+      "message": "Operation completed successfully",
+      "data": {},
+      "pagination": {}
+    },
+    "error": {
+      "success": false,
+      "message": "Error description",
+      "error": "Detailed error message"
+    }
+  },
+  "total_endpoints": 40,
+  "authentication_required": 35,
+  "admin_only": 9,
+  "public_endpoints": 5
+}

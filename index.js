@@ -7,10 +7,20 @@ import cors from 'cors';
 import authRoutes from './routes/authRoutes.js';
 import profileRoutes from "./routes/profileRoutes.js";
 import contactRoutes from "./routes/contactRoutes.js";
+import searchRoutes from "./routes/searchRoutes.js";
+import interactionRoutes from "./routes/interactionRoutes.js";
+import messagingRoutes from "./routes/messagingRoutes.js";
+import verificationRoutes from "./routes/verificationRoutes.js";
+import notificationRoutes from "./routes/notificationRoutes.js";
+import adminPanelRoutes from "./routes/adminPanelRoutes.js";
 
 import adminRoutes from "./admin/routes/adminRoutes.js";
 import membershipRoutes from "./admin/routes/membershipRoutes.js";
 import MembershipPlan from "./routes/usersMembershipRoutes.js";
+
+// Import middleware
+import { generalLimiter, authLimiter, otpLimiter, searchLimiter, messageLimiter, adminLimiter } from "./middlewares/rateLimiter.js";
+import { auditLogger, securityLogger } from "./middlewares/auditLogger.js";
 
 dotenv.config();
 connectDB();
@@ -29,10 +39,25 @@ app.use(cors({
 
 app.use(express.json());
 
+// Apply rate limiting
+app.use(generalLimiter);
+
+// Apply audit logging
+app.use(auditLogger);
+
 // 👉 Serve static files from the 'public' directory
 app.use(express.static('public'));
 
 app.use('/uploads', express.static('uploads'));
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'Server is running',
+    timestamp: new Date().toISOString()
+  });
+});
 
 const server = http.createServer(app);
 
@@ -58,11 +83,34 @@ io.on("connection", (socket) => {
   });
 });
 
-app.use("/api/admin", adminRoutes);
-app.use("/api/admin/membership", membershipRoutes);
+// Admin routes with admin rate limiting
+app.use("/api/admin", adminLimiter, adminRoutes);
+app.use("/api/admin/membership", adminLimiter, membershipRoutes);
+app.use("/api/admin/panel", adminLimiter, adminPanelRoutes);
 
-app.use('/api/auth', authRoutes);
+// Auth routes with auth rate limiting
+app.use('/api/auth', authLimiter, authRoutes);
+
+// OTP routes with OTP rate limiting
+app.use('/api/auth/otp', otpLimiter);
+
+// Profile and search routes
 app.use("/api/profiles", profileRoutes);
+app.use("/api/search", searchLimiter, searchRoutes);
+
+// Interaction routes
+app.use("/api/interactions", interactionRoutes);
+
+// Messaging routes with message rate limiting
+app.use("/api/chat", messageLimiter, messagingRoutes);
+
+// Verification routes
+app.use("/api/verify", verificationRoutes);
+
+// Notification routes
+app.use("/api/notifications", notificationRoutes);
+
+// Contact and membership routes
 app.use("/api/contact", contactRoutes);
 app.use("/api/user/membership", MembershipPlan);
 
