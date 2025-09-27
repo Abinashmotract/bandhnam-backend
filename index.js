@@ -88,8 +88,8 @@ app.use("/api/admin", adminLimiter, adminRoutes);
 app.use("/api/admin/membership", adminLimiter, membershipRoutes);
 app.use("/api/admin/panel", adminLimiter, adminPanelRoutes);
 
-// Auth routes with auth rate limiting
-app.use('/api/auth', authLimiter, authRoutes);
+// Auth routes with auth rate limiting authLimiter
+app.use('/api/auth', authRoutes);
 
 // OTP routes with OTP rate limiting
 app.use('/api/auth/otp', otpLimiter);

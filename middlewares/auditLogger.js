@@ -21,7 +21,15 @@ export const auditLogger = (req, res, next) => {
     const endTime = Date.now();
     const duration = endTime - startTime;
 
-    // Create audit log entry
+    // Ensure data is a string or Buffer for responseSize calculation
+    let responseDataForSize = data;
+    if (data && typeof data === "object" && !Buffer.isBuffer(data)) {
+      try {
+        responseDataForSize = JSON.stringify(data);
+      } catch (e) {
+        responseDataForSize = "[Unserializable object]";
+      }
+    }
     const auditLog = {
       timestamp: new Date().toISOString(),
       method: req.method,
@@ -33,7 +41,7 @@ export const auditLogger = (req, res, next) => {
       statusCode: res.statusCode,
       duration: `${duration}ms`,
       requestBody: req.method !== "GET" ? sanitizeRequestBody(req.body) : null,
-      responseSize: data ? Buffer.byteLength(data, "utf8") : 0
+      responseSize: responseDataForSize ? Buffer.byteLength(responseDataForSize, "utf8") : 0
     };
 
     // Write to audit log file

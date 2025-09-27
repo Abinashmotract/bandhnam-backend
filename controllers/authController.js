@@ -347,6 +347,13 @@ export const updateUser = async (req, res) => {
         if (preferences) {
             try {
                 const parsedPreferences = typeof preferences === "string" ? JSON.parse(preferences) : preferences;
+                // Ensure heightRange and lifestyleExpectations are always objects
+                if (!parsedPreferences.heightRange) {
+                    parsedPreferences.heightRange = user.preferences.heightRange || { min: '', max: '' };
+                }
+                if (!parsedPreferences.lifestyleExpectations) {
+                    parsedPreferences.lifestyleExpectations = user.preferences.lifestyleExpectations || { diet: '', drinking: '', smoking: '' };
+                }
                 user.preferences = {
                     ...user.preferences,
                     ...parsedPreferences,
