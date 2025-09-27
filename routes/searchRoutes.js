@@ -6,6 +6,7 @@ import {
   getSavedFilters,
   deleteSavedFilter
 } from "../controllers/searchController.js";
+import { getAdvancedMatches } from "../controllers/advancedMatchingController.js";
 import { VerifyToken } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
@@ -16,6 +17,7 @@ router.use(VerifyToken);
 // Search and filtering routes
 router.get("/", searchProfiles);
 router.get("/recommendations", getRecommendations);
+router.get("/advanced-matches", getAdvancedMatches);
 router.post("/save", saveSearchFilter);
 router.get("/saved", getSavedFilters);
 router.delete("/saved/:filterId", deleteSavedFilter);

@@ -13,6 +13,10 @@ import messagingRoutes from "./routes/messagingRoutes.js";
 import verificationRoutes from "./routes/verificationRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import adminPanelRoutes from "./routes/adminPanelRoutes.js";
+import horoscopeRoutes from "./routes/horoscopeRoutes.js";
+import successStoryRoutes from "./routes/successStoryRoutes.js";
+import blogRoutes from "./routes/blogRoutes.js";
+import analyticsRoutes from "./routes/analyticsRoutes.js";
 
 import adminRoutes from "./admin/routes/adminRoutes.js";
 import membershipRoutes from "./admin/routes/membershipRoutes.js";
@@ -113,6 +117,12 @@ app.use("/api/notifications", notificationRoutes);
 // Contact and membership routes
 app.use("/api/contact", contactRoutes);
 app.use("/api/user/membership", MembershipPlan);
+
+// New feature routes
+app.use("/api/horoscope", horoscopeRoutes);
+app.use("/api/success-stories", successStoryRoutes);
+app.use("/api/blog", blogRoutes);
+app.use("/api/analytics", analyticsRoutes);
 
 server.listen(process.env.PORT, () => {
   console.log(`Server running on port ${process.env.PORT}`);

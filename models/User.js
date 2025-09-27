@@ -63,7 +63,14 @@ const userSchema = new mongoose.Schema(
         max: { type: Number, default: 35 },
       },
       height: String, // old
-      heightRange: { min: String, max: String }, // new
+      heightRange: { 
+        type: {
+          min: String,
+          max: String
+        },
+        required: false,
+        default: undefined
+      }, // new
       maritalStatus: String, // old
       religion: String, // old
       education: String, // old
@@ -76,9 +83,13 @@ const userSchema = new mongoose.Schema(
       occupationPref: [String],
       annualIncomePref: String,
       lifestyleExpectations: {
-        diet: String,
-        drinking: String,
-        smoking: String,
+        type: {
+          diet: String,
+          drinking: String,
+          smoking: String
+        },
+        required: false,
+        default: undefined
       },
       religionCastePref: String,
       locationPref: String,

@@ -347,16 +347,19 @@ export const updateUser = async (req, res) => {
         if (preferences) {
             try {
                 const parsedPreferences = typeof preferences === "string" ? JSON.parse(preferences) : preferences;
-                // Ensure heightRange and lifestyleExpectations are always objects
-                if (!parsedPreferences.heightRange) {
-                    parsedPreferences.heightRange = user.preferences.heightRange || { min: '', max: '' };
-                }
-                if (!parsedPreferences.lifestyleExpectations) {
-                    parsedPreferences.lifestyleExpectations = user.preferences.lifestyleExpectations || { diet: '', drinking: '', smoking: '' };
-                }
+                
+                // Only update preferences that are provided and not undefined
+                const validPreferences = {};
+                Object.keys(parsedPreferences).forEach(key => {
+                    if (parsedPreferences[key] !== undefined && parsedPreferences[key] !== null) {
+                        validPreferences[key] = parsedPreferences[key];
+                    }
+                });
+                
+                // Merge with existing preferences
                 user.preferences = {
                     ...user.preferences,
-                    ...parsedPreferences,
+                    ...validPreferences,
                 };
             } catch (error) {
                 console.error("Error parsing preferences:", error);

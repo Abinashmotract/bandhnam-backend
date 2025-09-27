@@ -6,6 +6,10 @@
   "scripts": {
     "start": "node index.js",
     "seed": "node scripts/seedProfiles.js",
+    "clear": "node scripts/clearData.js",
+    "create-test-data": "node scripts/createTestData.js",
+    "test-apis": "node scripts/testAllAPIs.js",
+    "clear-and-seed": "node scripts/clearAndSeedData.js",
     "dev": "nodemon index.js"
   },
   "keywords": [],
@@ -15,6 +19,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.828.0",
     "@aws-sdk/lib-storage": "^3.828.0",
+    "axios": "^1.12.2",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
@@ -22,7 +27,7 @@
     "express-rate-limit": "^7.1.5",
     "http-errors": "^2.0.0",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.18.1",
+    "mongoose": "^8.18.2",
     "multer": "^1.4.5-lts.1",
     "node-fetch": "^3.3.2",
     "nodemailer": "^7.0.3",
