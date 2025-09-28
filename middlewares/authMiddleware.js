@@ -36,3 +36,22 @@ export const VerifyAdmin = (req, res, next) => {
     next();
   });
 };
+
+export const RequireFullVerification = (req, res, next) => {
+  VerifyToken(req, res, () => {
+    const user = req.user;
+    if (!user?.isEmailVerified) {
+      return res.status(403).json({ message: "Email not verified" });
+    }
+    if (!user?.isPhoneVerified) {
+      return res.status(403).json({ message: "Phone not verified" });
+    }
+    if (!user?.isIdVerified) {
+      return res.status(403).json({ message: "ID not verified" });
+    }
+    if (!user?.isPhotoVerified) {
+      return res.status(403).json({ message: "Photos not verified" });
+    }
+    next();
+  });
+};

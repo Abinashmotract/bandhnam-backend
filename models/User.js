@@ -123,6 +123,11 @@ const userSchema = new mongoose.Schema(
     otp: String,
     otpExpiry: Date,
     isOtpVerified: { type: Boolean, default: false },
+    // Verification flags
+    isEmailVerified: { type: Boolean, default: false },
+    isPhoneVerified: { type: Boolean, default: false },
+    isIdVerified: { type: Boolean, default: false },
+    isPhotoVerified: { type: Boolean, default: false },
     profileCompletion: { type: Number, default: 0 },
   },
   { timestamps: true }

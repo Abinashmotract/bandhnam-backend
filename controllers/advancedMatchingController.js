@@ -417,3 +417,4 @@ function areRelatedOccupations(occ1, occ2) {
   }
   return false;
 }
+

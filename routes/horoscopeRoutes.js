@@ -21,3 +21,4 @@ router.get("/matches", getHoroscopeMatches);
 router.get("/compatibility/:userId1/:userId2", calculateCompatibility);
 
 export default router;
+

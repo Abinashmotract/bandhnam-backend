@@ -384,3 +384,4 @@ function calculateProfileQualityScore(user) {
 
   return Math.round((score / totalWeight) * 100);
 }
+

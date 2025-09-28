@@ -166,3 +166,4 @@ profileAnalyticsSchema.index({ qualityScore: -1 });
 profileAnalyticsSchema.index({ lastUpdated: -1 });
 
 export default mongoose.model("ProfileAnalytics", profileAnalyticsSchema);
+

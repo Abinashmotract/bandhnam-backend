@@ -8,12 +8,12 @@ import {
   addMessageReaction,
   getTypingStatus
 } from "../controllers/messagingController.js";
-import { VerifyToken } from "../middlewares/authMiddleware.js";
+import { RequireFullVerification } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
-// All routes require authentication
-router.use(VerifyToken);
+// All routes require full verification
+router.use(RequireFullVerification);
 
 // Messaging routes
 router.post("/:userId", sendMessage);

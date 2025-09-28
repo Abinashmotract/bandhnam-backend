@@ -133,3 +133,4 @@ successStorySchema.index({ createdAt: -1 });
 successStorySchema.index({ "bride.profileId": 1, "groom.profileId": 1 });
 
 export default mongoose.model("SuccessStory", successStorySchema);
+

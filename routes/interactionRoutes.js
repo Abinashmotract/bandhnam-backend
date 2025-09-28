@@ -11,12 +11,12 @@ import {
   getProfileViews,
   getFavourites
 } from "../controllers/interactionController.js";
-import { VerifyToken } from "../middlewares/authMiddleware.js";
+import { RequireFullVerification } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
-// All routes require authentication
-router.use(VerifyToken);
+// All routes require full verification
+router.use(RequireFullVerification);
 
 // Interaction routes
 router.post("/like/:userId", likeProfile);

@@ -150,3 +150,4 @@ blogSchema.pre('save', function(next) {
 });
 
 export default mongoose.model("Blog", blogSchema);
+

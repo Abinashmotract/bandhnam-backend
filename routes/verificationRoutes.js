@@ -15,12 +15,14 @@ import upload from "../middlewares/upload.js";
 
 const router = express.Router();
 
+// Public route: email confirmation via link should NOT require auth header
+router.get("/email/confirm", confirmEmailVerification);
+
 // User routes (require authentication)
 router.use(VerifyToken);
 
 // Email verification
 router.post("/email", sendEmailVerification);
-router.get("/email/confirm", confirmEmailVerification);
 
 // Phone verification
 router.post("/phone", sendPhoneVerification);

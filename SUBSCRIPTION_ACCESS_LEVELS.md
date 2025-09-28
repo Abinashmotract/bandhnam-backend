@@ -249,3 +249,4 @@ This document defines the access levels and features available to users based on
 ---
 
 *This subscription model ensures that users can start with basic features and upgrade as their matrimonial search becomes more serious, providing value at every tier while encouraging upgrades for enhanced features.*
+

@@ -33,3 +33,4 @@ router.put("/:postId", updateBlogPost);
 router.delete("/:postId", deleteBlogPost);
 
 export default router;
+

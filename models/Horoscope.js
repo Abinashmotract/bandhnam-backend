@@ -114,3 +114,4 @@ horoscopeSchema.index({ "compatibilityFactors.manglik": 1 });
 horoscopeSchema.index({ overallScore: -1 });
 
 export default mongoose.model("Horoscope", horoscopeSchema);
+

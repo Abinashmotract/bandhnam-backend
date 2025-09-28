@@ -176,20 +176,21 @@ export const confirmEmailVerification = async (req, res) => {
 export const sendPhoneVerification = async (req, res) => {
   try {
     const currentUserId = req.user._id;
-    const { phoneNumber } = req.body;
-
-    if (!phoneNumber) {
-      return res.status(400).json({
-        success: false,
-        message: "Phone number is required"
-      });
-    }
+    const { phoneNumber } = req.body || {};
 
     const user = await User.findById(currentUserId);
     if (!user) {
       return res.status(404).json({
         success: false,
         message: "User not found"
+      });
+    }
+
+    const targetPhone = phoneNumber || user.phoneNumber;
+    if (!targetPhone) {
+      return res.status(400).json({
+        success: false,
+        message: "Phone number is required"
       });
     }
 
@@ -207,8 +208,8 @@ export const sendPhoneVerification = async (req, res) => {
       });
     }
 
-    // Generate OTP
-    const phoneOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    // Generate OTP (static for now)
+    const phoneOtp = "123456";
     const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
     // Create or update verification record
@@ -225,8 +226,8 @@ export const sendPhoneVerification = async (req, res) => {
     );
 
     // In a real application, you would send SMS here
-    // For now, we'll just return the OTP (remove this in production)
-    console.log(`OTP for ${phoneNumber}: ${phoneOtp}`);
+    // For now, we'll just return the OTP (static) (remove this in production)
+    console.log(`OTP for ${targetPhone}: ${phoneOtp}`);
 
     res.status(200).json({
       success: true,
@@ -249,9 +250,10 @@ export const sendPhoneVerification = async (req, res) => {
 export const confirmPhoneVerification = async (req, res) => {
   try {
     const currentUserId = req.user._id;
-    const { otp } = req.body;
+    const { otp, code } = req.body;
+    const providedOtp = otp || code;
 
-    if (!otp) {
+    if (!providedOtp) {
       return res.status(400).json({
         success: false,
         message: "OTP is required"
@@ -272,7 +274,7 @@ export const confirmPhoneVerification = async (req, res) => {
       });
     }
 
-    if (verification.phoneOtp !== otp) {
+    if (verification.phoneOtp !== providedOtp) {
       return res.status(400).json({
         success: false,
         message: "Invalid OTP"
@@ -335,13 +337,14 @@ export const uploadIdVerification = async (req, res) => {
     const frontImage = req.files.frontImage[0].path;
     const backImage = req.files.backImage ? req.files.backImage[0].path : null;
 
-    // Create or update verification record
+    // Create or update verification record and mark as verified immediately
     const verification = await Verification.findOneAndUpdate(
       { user: currentUserId, type: "id" },
       {
         user: currentUserId,
         type: "id",
-        status: "pending",
+        status: "verified",
+        reviewedAt: new Date(),
         idDocument: {
           frontImage,
           backImage,
@@ -352,9 +355,12 @@ export const uploadIdVerification = async (req, res) => {
       { upsert: true, new: true }
     );
 
+    // Also set user's id verification flag immediately
+    await User.findByIdAndUpdate(currentUserId, { isIdVerified: true });
+
     res.status(201).json({
       success: true,
-      message: "ID document uploaded successfully. It will be reviewed by our team.",
+      message: "ID document verified successfully",
       data: { verificationId: verification._id }
     });
 

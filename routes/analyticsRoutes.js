@@ -19,3 +19,4 @@ router.get("/insights", getAnalyticsInsights);
 router.post("/update", updateAnalytics);
 
 export default router;
+
