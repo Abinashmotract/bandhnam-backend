@@ -5,7 +5,7 @@ const membershipPlanSchema = new mongoose.Schema(
     name: {
       type: String,
       required: true,
-      enum: ["Basic", "Premium", "Elite"],
+      enum: ["Basic", "Entry", "Advanced", "Premium", "Elite"],
       unique: false
     },
     price: {
@@ -35,6 +35,27 @@ const membershipPlanSchema = new mongoose.Schema(
     isActive: {
       type: Boolean,
       default: true
+    },
+    planType: {
+      type: String,
+      enum: ["free", "paid"],
+      default: "paid"
+    },
+    profileViews: {
+      type: Number,
+      default: 0
+    },
+    interests: {
+      type: Number,
+      default: 0
+    },
+    shortlists: {
+      type: Number,
+      default: 0
+    },
+    contactViews: {
+      type: Number,
+      default: 0
     }
   },
   { timestamps: true }

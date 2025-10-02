@@ -10,17 +10,24 @@ import contactRoutes from "./routes/contactRoutes.js";
 import searchRoutes from "./routes/searchRoutes.js";
 import interactionRoutes from "./routes/interactionRoutes.js";
 import messagingRoutes from "./routes/messagingRoutes.js";
-import verificationRoutes from "./routes/verificationRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import adminPanelRoutes from "./routes/adminPanelRoutes.js";
 import horoscopeRoutes from "./routes/horoscopeRoutes.js";
 import successStoryRoutes from "./routes/successStoryRoutes.js";
 import blogRoutes from "./routes/blogRoutes.js";
-import analyticsRoutes from "./routes/analyticsRoutes.js";
-
 import adminRoutes from "./admin/routes/adminRoutes.js";
 import membershipRoutes from "./admin/routes/membershipRoutes.js";
+import subscriptionManagementRoutes from "./routes/subscriptionManagementRoutes.js";
+import subscriptionRoutes from "./routes/subscriptionRoutes.js";
 import MembershipPlan from "./routes/usersMembershipRoutes.js";
+
+// Admin panel new routes
+import matchesRoutes from "./routes/matchesRoutes.js";
+import messagesRoutes from "./routes/messagesRoutes.js";
+import adminVerificationRoutes from "./routes/verificationRoutes.js";
+import adminAnalyticsRoutes from "./routes/analyticsRoutes.js";
+import successStoriesRoutes from "./routes/successStoriesRoutes.js";
+import systemSettingsRoutes from "./routes/systemSettingsRoutes.js";
 
 // Import middleware
 import { generalLimiter, authLimiter, otpLimiter, searchLimiter, messageLimiter, adminLimiter } from "./middlewares/rateLimiter.js";
@@ -91,6 +98,7 @@ io.on("connection", (socket) => {
 app.use("/api/admin", adminLimiter, adminRoutes);
 app.use("/api/admin/membership", adminLimiter, membershipRoutes);
 app.use("/api/admin/panel", adminLimiter, adminPanelRoutes);
+app.use("/api/membership", adminLimiter, subscriptionManagementRoutes);
 
 // Auth routes with auth rate limiting authLimiter
 app.use('/api/auth', authRoutes);
@@ -109,7 +117,7 @@ app.use("/api/interactions", interactionRoutes);
 app.use("/api/chat", messageLimiter, messagingRoutes);
 
 // Verification routes
-app.use("/api/verify", verificationRoutes);
+app.use("/api/verify", adminVerificationRoutes);
 
 // Notification routes
 app.use("/api/notifications", notificationRoutes);
@@ -117,12 +125,21 @@ app.use("/api/notifications", notificationRoutes);
 // Contact and membership routes
 app.use("/api/contact", contactRoutes);
 app.use("/api/user/membership", MembershipPlan);
+app.use("/api/user/subscription", subscriptionRoutes);
 
 // New feature routes
 app.use("/api/horoscope", horoscopeRoutes);
 app.use("/api/success-stories", successStoryRoutes);
 app.use("/api/blog", blogRoutes);
-app.use("/api/analytics", analyticsRoutes);
+app.use("/api/analytics", adminAnalyticsRoutes);
+
+// Admin panel routes
+app.use("/api/admin/matches", adminLimiter, matchesRoutes);
+app.use("/api/admin/messages", adminLimiter, messagesRoutes);
+app.use("/api/admin/verification", adminLimiter, adminVerificationRoutes);
+app.use("/api/admin/analytics", adminLimiter, adminAnalyticsRoutes);
+app.use("/api/admin/success-stories", adminLimiter, successStoriesRoutes);
+app.use("/api/admin/settings", adminLimiter, systemSettingsRoutes);
 
 server.listen(process.env.PORT, () => {
   console.log(`Server running on port ${process.env.PORT}`);

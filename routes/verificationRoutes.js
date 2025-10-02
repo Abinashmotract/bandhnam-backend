@@ -1,47 +1,18 @@
 import express from "express";
 import {
-  sendEmailVerification,
-  confirmEmailVerification,
-  sendPhoneVerification,
-  confirmPhoneVerification,
-  uploadIdVerification,
-  uploadVerificationPhotos,
-  getVerificationStatus,
-  getPendingVerifications,
-  reviewVerification
+  getAllVerifications,
+  approveVerification,
+  rejectVerification,
+  getVerificationAnalytics
 } from "../controllers/verificationController.js";
-import { VerifyToken, VerifyAdmin } from "../middlewares/authMiddleware.js";
-import upload from "../middlewares/upload.js";
+import { VerifyAdmin } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
-// Public route: email confirmation via link should NOT require auth header
-router.get("/email/confirm", confirmEmailVerification);
-
-// User routes (require authentication)
-router.use(VerifyToken);
-
-// Email verification
-router.post("/email", sendEmailVerification);
-
-// Phone verification
-router.post("/phone", sendPhoneVerification);
-router.post("/phone/confirm", confirmPhoneVerification);
-
-// ID verification
-router.post("/id", upload.fields([
-  { name: "frontImage", maxCount: 1 },
-  { name: "backImage", maxCount: 1 }
-]), uploadIdVerification);
-
-// Photo verification
-router.post("/photo", upload.array("photos", 5), uploadVerificationPhotos);
-
-// Get verification status
-router.get("/status", getVerificationStatus);
-
-// Admin routes (require admin authentication)
-router.get("/admin/pending", VerifyAdmin, getPendingVerifications);
-router.put("/admin/:verificationId/review", VerifyAdmin, reviewVerification);
+// Verification Center routes
+router.get("/", VerifyAdmin, getAllVerifications);
+router.patch("/:verificationId/approve", VerifyAdmin, approveVerification);
+router.patch("/:verificationId/reject", VerifyAdmin, rejectVerification);
+router.get("/analytics/overview", VerifyAdmin, getVerificationAnalytics);
 
 export default router;

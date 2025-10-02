@@ -1,22 +1,16 @@
 import express from "express";
 import {
-  getProfileAnalytics,
-  getDetailedAnalytics,
-  getAnalyticsInsights,
-  updateAnalytics
+  getComprehensiveAnalytics,
+  getDashboardStats,
+  generateReport
 } from "../controllers/analyticsController.js";
-import { VerifyToken } from "../middlewares/authMiddleware.js";
+import { VerifyAdmin } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
-// All routes require authentication
-router.use(VerifyToken);
-
-// Analytics routes
-router.get("/", getProfileAnalytics);
-router.get("/detailed", getDetailedAnalytics);
-router.get("/insights", getAnalyticsInsights);
-router.post("/update", updateAnalytics);
+// Reports & Analytics routes
+router.get("/comprehensive", VerifyAdmin, getComprehensiveAnalytics);
+router.get("/dashboard", VerifyAdmin, getDashboardStats);
+router.post("/reports/generate", VerifyAdmin, generateReport);
 
 export default router;
-

@@ -1,105 +1,39 @@
-import ProfileAnalytics from "../models/ProfileAnalytics.js";
 import User from "../models/User.js";
 import Interaction from "../models/Interaction.js";
+import UserMembership from "../models/UserMembership.js";
 
-// Get profile analytics
-export const getProfileAnalytics = async (req, res) => {
+// Get comprehensive analytics
+export const getComprehensiveAnalytics = async (req, res) => {
   try {
-    const userId = req.user._id;
-    const { period = "30" } = req.query; // days
-
-    let analytics = await ProfileAnalytics.findOne({ user: userId });
+    const { startDate, endDate } = req.query;
     
-    if (!analytics) {
-      // Create new analytics record
-      analytics = await ProfileAnalytics.create({ user: userId });
+    let dateFilter = {};
+    if (startDate && endDate) {
+      dateFilter.createdAt = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate)
+      };
     }
-
-    // Calculate period-based analytics
-    const daysAgo = new Date();
-    daysAgo.setDate(daysAgo.getDate() - parseInt(period));
-
-    // Get recent interactions
-    const recentInteractions = await Interaction.find({
-      toUser: userId,
-      createdAt: { $gte: daysAgo }
-    });
-
-    // Calculate metrics
-    const totalViews = recentInteractions.filter(i => i.type === "visit").length;
-    const totalLikes = recentInteractions.filter(i => i.type === "like").length;
-    const totalSuperLikes = recentInteractions.filter(i => i.type === "superlike").length;
-    const totalFavourites = recentInteractions.filter(i => i.type === "favourite").length;
-
-    // Get profile quality score
-    const user = await User.findById(userId);
-    const qualityScore = calculateProfileQualityScore(user);
-
-    // Update analytics
-    analytics.totalViews += totalViews;
-    analytics.totalLikes += totalLikes;
-    analytics.totalSuperLikes += totalSuperLikes;
-    analytics.totalFavourites += totalFavourites;
-    analytics.qualityScore = qualityScore;
-    analytics.lastUpdated = new Date();
-
-    await analytics.save();
-
-    res.status(200).json({
-      success: true,
-      message: "Profile analytics fetched successfully",
-      data: {
-        totalViews: analytics.totalViews,
-        totalLikes: analytics.totalLikes,
-        totalSuperLikes: analytics.totalSuperLikes,
-        totalFavourites: analytics.totalFavourites,
-        qualityScore: analytics.qualityScore,
-        recentActivity: {
-          views: totalViews,
-          likes: totalLikes,
-          superLikes: totalSuperLikes,
-          favourites: totalFavourites
-        },
-        period: `${period} days`
-      }
-    });
-
-  } catch (error) {
-    console.error("Get profile analytics error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Server error while fetching profile analytics",
-      error: error.message
-    });
-  }
-};
-
-// Get detailed analytics
-export const getDetailedAnalytics = async (req, res) => {
-  try {
-    const userId = req.user._id;
-    const { period = "30" } = req.query;
-
-    const analytics = await ProfileAnalytics.findOne({ user: userId });
-    if (!analytics) {
-      return res.status(404).json({
-        success: false,
-        message: "Analytics not found for this user"
-      });
-    }
-
-    // Get views by day for the specified period
-    const daysAgo = new Date();
-    daysAgo.setDate(daysAgo.getDate() - parseInt(period));
-
-    const viewsByDay = await Interaction.aggregate([
+    
+    // User analytics
+    const userStats = await User.aggregate([
+      { $match: { role: "user", ...dateFilter } },
       {
-        $match: {
-          toUser: userId,
-          type: "visit",
-          createdAt: { $gte: daysAgo }
+        $group: {
+          _id: null,
+          totalUsers: { $sum: 1 },
+          activeUsers: { $sum: { $cond: ["$isActive", 1, 0] } },
+          verifiedUsers: { $sum: { $cond: ["$isEmailVerified", 1, 0] } },
+          phoneVerifiedUsers: { $sum: { $cond: ["$isPhoneVerified", 1, 0] } },
+          idVerifiedUsers: { $sum: { $cond: ["$isIdVerified", 1, 0] } },
+          photoVerifiedUsers: { $sum: { $cond: ["$isPhotoVerified", 1, 0] } }
         }
-      },
+      }
+    ]);
+    
+    // User growth over time
+    const userGrowth = await User.aggregate([
+      { $match: { role: "user", ...dateFilter } },
       {
         $group: {
           _id: {
@@ -110,44 +44,73 @@ export const getDetailedAnalytics = async (req, res) => {
           count: { $sum: 1 }
         }
       },
+      { $sort: { "_id.year": 1, "_id.month": 1, "_id.day": 1 } }
+    ]);
+    
+    // Interaction analytics
+    const interactionStats = await Interaction.aggregate([
+      { $match: dateFilter },
       {
-        $sort: { "_id.year": 1, "_id.month": 1, "_id.day": 1 }
+        $group: {
+          _id: "$type",
+          count: { $sum: 1 }
+        }
       }
     ]);
-
-    // Get views by age group
-    const viewsByAgeGroup = await Interaction.aggregate([
-      {
-        $match: {
-          toUser: userId,
-          type: "visit"
-        }
-      },
+    
+    // Revenue analytics (from memberships)
+    const revenueStats = await UserMembership.aggregate([
+      { $match: { ...dateFilter } },
       {
         $lookup: {
-          from: "users",
-          localField: "fromUser",
+          from: "membershipplans",
+          localField: "plan",
           foreignField: "_id",
-          as: "viewer"
+          as: "planDetails"
         }
       },
       {
-        $unwind: "$viewer"
+        $unwind: "$planDetails"
       },
+      {
+        $group: {
+          _id: null,
+          totalRevenue: { $sum: "$planDetails.price" },
+          activeSubscriptions: { $sum: 1 }
+        }
+      }
+    ]);
+    
+    // Gender distribution
+    const genderDistribution = await User.aggregate([
+      { $match: { role: "user", ...dateFilter } },
+      {
+        $group: {
+          _id: "$gender",
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+    
+    // Age distribution
+    const ageDistribution = await User.aggregate([
+      { $match: { role: "user", dob: { $exists: true }, ...dateFilter } },
       {
         $addFields: {
           age: {
-            $subtract: [
-              { $year: new Date() },
-              { $year: "$viewer.dob" }
-            ]
+            $floor: {
+              $divide: [
+                { $subtract: [new Date(), "$dob"] },
+                31557600000 // milliseconds in a year
+              ]
+            }
           }
         }
       },
       {
         $bucket: {
           groupBy: "$age",
-          boundaries: [0, 25, 30, 35, 40, 50, 100],
+          boundaries: [18, 25, 30, 35, 40, 45, 50, 100],
           default: "50+",
           output: {
             count: { $sum: 1 }
@@ -155,233 +118,189 @@ export const getDetailedAnalytics = async (req, res) => {
         }
       }
     ]);
-
-    // Get views by location
-    const viewsByLocation = await Interaction.aggregate([
-      {
-        $match: {
-          toUser: userId,
-          type: "visit"
-        }
-      },
-      {
-        $lookup: {
-          from: "users",
-          localField: "fromUser",
-          foreignField: "_id",
-          as: "viewer"
-        }
-      },
-      {
-        $unwind: "$viewer"
-      },
-      {
-        $group: {
-          _id: "$viewer.location",
-          count: { $sum: 1 }
-        }
-      },
-      {
-        $sort: { count: -1 }
-      },
-      {
-        $limit: 10
-      }
-    ]);
-
+    
     res.status(200).json({
       success: true,
-      message: "Detailed analytics fetched successfully",
+      message: "Analytics retrieved successfully",
       data: {
-        overview: {
-          totalViews: analytics.totalViews,
-          totalLikes: analytics.totalLikes,
-          totalSuperLikes: analytics.totalSuperLikes,
-          totalFavourites: analytics.totalFavourites,
-          qualityScore: analytics.qualityScore
+        userStats: userStats[0] || {},
+        userGrowth,
+        interactionStats,
+        revenueStats: revenueStats[0] || {},
+        genderDistribution,
+        ageDistribution
+      }
+    });
+  } catch (error) {
+    console.error("Get analytics error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while fetching analytics",
+      error: error.message
+    });
+  }
+};
+
+// Get dashboard statistics
+export const getDashboardStats = async (req, res) => {
+  try {
+    const totalUsers = await User.countDocuments({ role: "user" });
+    const activeUsers = await User.countDocuments({ role: "user", isActive: true });
+    const thisMonthUsers = await User.countDocuments({
+      role: "user",
+      createdAt: { $gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) }
+    });
+    
+    const totalLikes = await Interaction.countDocuments({ type: "like" });
+    const totalInterests = await Interaction.countDocuments({ type: "interest" });
+    const totalMessages = await Interaction.countDocuments({ type: "message" });
+    
+    // Get premium users
+    const premiumUsers = await UserMembership.countDocuments({ isActive: true });
+    
+    res.status(200).json({
+      success: true,
+      message: "Dashboard stats retrieved successfully",
+      data: {
+        total: {
+          totalUsers,
+          totalLikes,
+          totalInterests,
+          totalMessages,
+          premiumUsers
         },
-        viewsByDay,
-        viewsByAgeGroup,
-        viewsByLocation,
-        period: `${period} days`
+        thisMonth: {
+          newUsers: thisMonthUsers
+        },
+        activeUsers
       }
     });
-
   } catch (error) {
-    console.error("Get detailed analytics error:", error);
+    console.error("Get dashboard stats error:", error);
     res.status(500).json({
       success: false,
-      message: "Server error while fetching detailed analytics",
+      message: "Server error while fetching dashboard stats",
       error: error.message
     });
   }
 };
 
-// Get analytics insights
-export const getAnalyticsInsights = async (req, res) => {
+// Generate reports
+export const generateReport = async (req, res) => {
   try {
-    const userId = req.user._id;
-
-    const analytics = await ProfileAnalytics.findOne({ user: userId });
-    if (!analytics) {
-      return res.status(404).json({
-        success: false,
-        message: "Analytics not found for this user"
-      });
+    const { reportType, startDate, endDate } = req.body;
+    
+    let dateFilter = {};
+    if (startDate && endDate) {
+      dateFilter.createdAt = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate)
+      };
     }
-
-    const user = await User.findById(userId);
-    const insights = [];
-
-    // Profile completion insights
-    if (user.profileCompletion < 80) {
-      insights.push({
-        type: "warning",
-        title: "Profile Incomplete",
-        message: `Your profile is ${user.profileCompletion}% complete. Complete your profile to get more matches.`,
-        action: "Complete Profile"
-      });
+    
+    let reportData = {};
+    
+    switch (reportType) {
+      case 'user_activity':
+        reportData = await generateUserActivityReport(dateFilter);
+        break;
+      case 'revenue':
+        reportData = await generateRevenueReport(dateFilter);
+        break;
+      case 'matches':
+        reportData = await generateMatchesReport(dateFilter);
+        break;
+      default:
+        return res.status(400).json({
+          success: false,
+          message: "Invalid report type"
+        });
     }
-
-    // Photo insights
-    if (!user.profileImage) {
-      insights.push({
-        type: "warning",
-        title: "No Profile Photo",
-        message: "Add a profile photo to increase your chances of getting matches by 3x.",
-        action: "Add Photo"
-      });
-    }
-
-    // Activity insights
-    if (analytics.totalViews < 10) {
-      insights.push({
-        type: "info",
-        title: "Low Profile Views",
-        message: "Your profile has low visibility. Consider updating your preferences or adding more photos.",
-        action: "Update Profile"
-      });
-    }
-
-    // Quality score insights
-    if (analytics.qualityScore < 70) {
-      insights.push({
-        type: "warning",
-        title: "Profile Quality",
-        message: "Your profile quality score is below average. Focus on completing all sections.",
-        action: "Improve Profile"
-      });
-    }
-
-    // Positive insights
-    if (analytics.totalLikes > 5) {
-      insights.push({
-        type: "success",
-        title: "Great Engagement",
-        message: "Your profile is getting good engagement! Keep it up.",
-        action: null
-      });
-    }
-
+    
     res.status(200).json({
       success: true,
-      message: "Analytics insights fetched successfully",
-      data: {
-        insights,
-        qualityScore: analytics.qualityScore,
-        profileCompletion: user.profileCompletion
+      message: "Report generated successfully",
+      data: reportData
+    });
+  } catch (error) {
+    console.error("Generate report error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while generating report",
+      error: error.message
+    });
+  }
+};
+
+// Helper function to generate user activity report
+const generateUserActivityReport = async (dateFilter) => {
+  const userActivity = await User.aggregate([
+    { $match: { role: "user", ...dateFilter } },
+    {
+      $group: {
+        _id: {
+          year: { $year: "$createdAt" },
+          month: { $month: "$createdAt" }
+        },
+        newUsers: { $sum: 1 },
+        activeUsers: { $sum: { $cond: ["$isActive", 1, 0] } }
       }
-    });
-
-  } catch (error) {
-    console.error("Get analytics insights error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Server error while fetching analytics insights",
-      error: error.message
-    });
-  }
+    },
+    { $sort: { "_id.year": 1, "_id.month": 1 } }
+  ]);
+  
+  return { userActivity };
 };
 
-// Update analytics
-export const updateAnalytics = async (req, res) => {
-  try {
-    const userId = req.user._id;
-    const { type, targetUserId } = req.body;
-
-    let analytics = await ProfileAnalytics.findOne({ user: userId });
-    if (!analytics) {
-      analytics = await ProfileAnalytics.create({ user: userId });
-    }
-
-    // Update based on interaction type
-    switch (type) {
-      case "view":
-        analytics.totalViews += 1;
-        break;
-      case "like":
-        analytics.totalLikes += 1;
-        break;
-      case "superlike":
-        analytics.totalSuperLikes += 1;
-        break;
-      case "favourite":
-        analytics.totalFavourites += 1;
-        break;
-    }
-
-    analytics.lastUpdated = new Date();
-    await analytics.save();
-
-    res.status(200).json({
-      success: true,
-      message: "Analytics updated successfully"
-    });
-
-  } catch (error) {
-    console.error("Update analytics error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Server error while updating analytics",
-      error: error.message
-    });
-  }
+// Helper function to generate revenue report
+const generateRevenueReport = async (dateFilter) => {
+  const revenue = await UserMembership.aggregate([
+    { $match: { ...dateFilter } },
+    {
+      $lookup: {
+        from: "membershipplans",
+        localField: "plan",
+        foreignField: "_id",
+        as: "planDetails"
+      }
+    },
+    {
+      $unwind: "$planDetails"
+    },
+    {
+      $group: {
+        _id: {
+          year: { $year: "$createdAt" },
+          month: { $month: "$createdAt" }
+        },
+        totalRevenue: { $sum: "$planDetails.price" },
+        subscriptions: { $sum: 1 }
+      }
+    },
+    { $sort: { "_id.year": 1, "_id.month": 1 } }
+  ]);
+  
+  return { revenue };
 };
 
-// Helper function to calculate profile quality score
-function calculateProfileQualityScore(user) {
-  let score = 0;
-  let totalWeight = 0;
-
-  // Basic information (40% weight)
-  const basicInfoWeight = 40;
-  totalWeight += basicInfoWeight;
-  if (user.name && user.email && user.phoneNumber) score += basicInfoWeight * 0.3;
-  if (user.dob) score += basicInfoWeight * 0.2;
-  if (user.location) score += basicInfoWeight * 0.2;
-  if (user.occupation) score += basicInfoWeight * 0.3;
-
-  // Photos (25% weight)
-  const photosWeight = 25;
-  totalWeight += photosWeight;
-  if (user.profileImage) score += photosWeight * 0.6;
-  if (user.photos && user.photos.length > 0) score += photosWeight * 0.4;
-
-  // About section (15% weight)
-  const aboutWeight = 15;
-  totalWeight += aboutWeight;
-  if (user.about && user.about.length > 50) score += aboutWeight;
-
-  // Interests (10% weight)
-  const interestsWeight = 10;
-  totalWeight += interestsWeight;
-  if (user.interests && user.interests.length > 0) score += interestsWeight;
-
-  // Preferences (10% weight)
-  const preferencesWeight = 10;
-  totalWeight += preferencesWeight;
-  if (user.preferences) score += preferencesWeight;
-
-  return Math.round((score / totalWeight) * 100);
-}
-
+// Helper function to generate matches report
+const generateMatchesReport = async (dateFilter) => {
+  const matches = await Interaction.aggregate([
+    { $match: { type: { $in: ["like", "interest", "shortlist"] }, ...dateFilter } },
+    {
+      $group: {
+        _id: {
+          year: { $year: "$createdAt" },
+          month: { $month: "$createdAt" }
+        },
+        totalMatches: { $sum: 1 },
+        likes: { $sum: { $cond: [{ $eq: ["$type", "like"] }, 1, 0] } },
+        interests: { $sum: { $cond: [{ $eq: ["$type", "interest"] }, 1, 0] } },
+        shortlists: { $sum: { $cond: [{ $eq: ["$type", "shortlist"] }, 1, 0] } }
+      }
+    },
+    { $sort: { "_id.year": 1, "_id.month": 1 } }
+  ]);
+  
+  return { matches };
+};

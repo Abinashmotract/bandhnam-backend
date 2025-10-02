@@ -129,6 +129,37 @@ const userSchema = new mongoose.Schema(
     isIdVerified: { type: Boolean, default: false },
     isPhotoVerified: { type: Boolean, default: false },
     profileCompletion: { type: Number, default: 0 },
+    
+    // Account status
+    isActive: { type: Boolean, default: true },
+    banReason: String,
+    banExpiry: Date,
+    adminNotes: String,
+    
+    // Membership information
+    membership: {
+      plan: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'MembershipPlan'
+      },
+      startDate: Date,
+      endDate: Date,
+      isActive: { type: Boolean, default: false }
+    },
+    
+    // Interaction data
+    likes: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    }],
+    dislikes: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    }],
+    shortlists: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    }],
   },
   { timestamps: true }
 );
