@@ -1,5 +1,7 @@
-import express from 'express';
 import dotenv from 'dotenv';
+dotenv.config();
+
+import express from 'express';
 import connectDB from './config/db.js';
 import { Server } from "socket.io";
 import http from 'http';
@@ -33,7 +35,6 @@ import systemSettingsRoutes from "./routes/systemSettingsRoutes.js";
 import { generalLimiter, authLimiter, otpLimiter, searchLimiter, messageLimiter, adminLimiter } from "./middlewares/rateLimiter.js";
 import { auditLogger, securityLogger } from "./middlewares/auditLogger.js";
 
-dotenv.config();
 connectDB();
 
 const app = express();

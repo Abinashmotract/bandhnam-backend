@@ -3,7 +3,19 @@ import MembershipPlan from "../models/MembershipPlan.js";
 import UserMembership from "../models/UserMembership.js";
 import Stripe from 'stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_51SCHBXKg4JvCYZiYHDfFOKGn9SIiEUlmHkXskrqVEQgLQcfUQyT6AW8TnLDCi2OoSEyG0n06WkJ3sRyhunCB7Tuu003ov7Xh70');
+// Initialize Stripe lazily to ensure environment variables are loaded
+let stripe = null;
+
+const getStripe = () => {
+  if (!stripe) {
+    if (!process.env.STRIPE_SECRET_KEY) {
+      console.error('❌ STRIPE_SECRET_KEY is required but not found in environment variables.');
+      throw new Error('STRIPE_SECRET_KEY environment variable is required');
+    }
+    stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+  }
+  return stripe;
+};
 
 // Get subscription status
 export const getSubscriptionStatus = async (req, res) => {
@@ -58,7 +70,8 @@ export const createPaymentIntent = async (req, res) => {
     }
 
     // Create payment intent
-    const paymentIntent = await stripe.paymentIntents.create({
+    const stripeInstance = getStripe();
+    const paymentIntent = await stripeInstance.paymentIntents.create({
       amount: plan.price * 100, // Convert to paise
       currency: 'inr',
       metadata: {
@@ -92,7 +105,8 @@ export const confirmPayment = async (req, res) => {
     const userId = req.user.id;
 
     // Verify payment intent with Stripe
-    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    const stripeInstance = getStripe();
+    const paymentIntent = await stripeInstance.paymentIntents.retrieve(paymentIntentId);
     
     if (paymentIntent.status !== 'succeeded') {
       return res.status(400).json({
@@ -291,7 +305,8 @@ export const handleWebhook = async (req, res) => {
     let event;
 
     try {
-      event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
+      const stripeInstance = getStripe();
+      event = stripeInstance.webhooks.constructEvent(req.body, sig, endpointSecret);
     } catch (err) {
       console.error('Webhook signature verification failed:', err.message);
       return res.status(400).send(`Webhook Error: ${err.message}`);
