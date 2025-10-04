@@ -1,13 +1,17 @@
 import express from "express";
 import {
   getSubscriptionStatus,
-  createPaymentIntent,
+  createCheckoutSession,
   confirmPayment,
   cancelSubscription,
   getSubscriptionHistory,
   updateUsage,
   handleWebhook,
-  getSubscriptionPlans
+  getSubscriptionPlans,
+  getAllTransactions,
+  getTransactionById,
+  getCheckoutSessionDetails,
+  processPaymentManually
 } from "../controllers/subscriptionController.js";
 import { VerifyToken } from "../middlewares/authMiddleware.js";
 
@@ -18,7 +22,9 @@ router.get("/plans", getSubscriptionPlans);
 
 // Protected routes
 router.get("/status", VerifyToken, getSubscriptionStatus);
-router.post("/create-payment-intent", VerifyToken, createPaymentIntent);
+router.post("/create-checkout-session", VerifyToken, createCheckoutSession);
+router.get("/checkout-session/:sessionId", VerifyToken, getCheckoutSessionDetails);
+router.post("/process-payment", VerifyToken, processPaymentManually);
 router.post("/confirm-payment", VerifyToken, confirmPayment);
 router.post("/cancel", VerifyToken, cancelSubscription);
 router.get("/history", VerifyToken, getSubscriptionHistory);
@@ -26,5 +32,9 @@ router.post("/update-usage", VerifyToken, updateUsage);
 
 // Webhook route (no auth required)
 router.post("/webhook", handleWebhook);
+
+// Admin routes for transactions
+router.get("/admin/transactions", VerifyToken, getAllTransactions);
+router.get("/admin/transactions/:transactionId", VerifyToken, getTransactionById);
 
 export default router;

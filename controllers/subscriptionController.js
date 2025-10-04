@@ -1,7 +1,9 @@
 import User from "../models/User.js";
 import MembershipPlan from "../models/MembershipPlan.js";
 import UserMembership from "../models/UserMembership.js";
+import Transaction from "../models/Transaction.js";
 import Stripe from 'stripe';
+import { sendInvoiceEmail } from '../utils/sendInvoiceEmail.js';
 
 // Initialize Stripe lazily to ensure environment variables are loaded
 let stripe = null;
@@ -48,8 +50,8 @@ export const getSubscriptionStatus = async (req, res) => {
   }
 };
 
-// Create payment intent
-export const createPaymentIntent = async (req, res) => {
+// Create Stripe Checkout Session for hosted payment page
+export const createCheckoutSession = async (req, res) => {
   try {
     const { planId } = req.body;
     const userId = req.user.id;
@@ -65,34 +67,50 @@ export const createPaymentIntent = async (req, res) => {
     if (plan.planType === 'free') {
       return res.status(400).json({
         success: false,
-        message: "Cannot create payment intent for free plan"
+        message: "Cannot create checkout session for free plan"
       });
     }
 
-    // Create payment intent
+    // Create checkout session
     const stripeInstance = getStripe();
-    const paymentIntent = await stripeInstance.paymentIntents.create({
-      amount: plan.price * 100, // Convert to paise
-      currency: 'inr',
+    const session = await stripeInstance.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price_data: {
+            currency: 'inr',
+            product_data: {
+              name: `${plan.name} Plan`,
+              description: plan.description || `Access to ${plan.name} features for ${plan.duration}`,
+            },
+            unit_amount: plan.price * 100, // Convert to paise
+          },
+          quantity: 1,
+        },
+      ],
+      mode: 'payment',
+      success_url: `${process.env.FRONTEND_URL || 'http://localhost:5174'}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:5174'}/membership?cancelled=true`,
       metadata: {
         userId: userId.toString(),
         planId: planId.toString()
-      }
+      },
+      customer_email: req.user.email,
     });
 
     res.status(200).json({
       success: true,
-      message: "Payment intent created successfully",
+      message: "Checkout session created successfully",
       data: {
-        clientSecret: paymentIntent.client_secret,
-        paymentIntentId: paymentIntent.id
+        sessionId: session.id,
+        url: session.url
       }
     });
   } catch (error) {
-    console.error("Create payment intent error:", error);
+    console.error("Create checkout session error:", error);
     res.status(500).json({
       success: false,
-      message: "Server error while creating payment intent",
+      message: "Server error while creating checkout session",
       error: error.message
     });
   }
@@ -157,6 +175,23 @@ export const confirmPayment = async (req, res) => {
 
     await userMembership.save();
 
+    // Create transaction record
+    const transaction = new Transaction({
+      user: userId,
+      plan: planId,
+      subscription: userMembership._id,
+      paymentIntentId,
+      stripeChargeId: paymentIntent.charges.data[0]?.id || paymentIntent.id,
+      amount: plan.price,
+      currency: 'INR',
+      status: 'succeeded',
+      paymentMethod: 'card',
+      description: `${plan.name} Plan Subscription (${plan.duration})`,
+      receiptUrl: paymentIntent.charges.data[0]?.receipt_url
+    });
+
+    await transaction.save();
+
     // Update user's membership reference
     await User.findByIdAndUpdate(userId, {
       membership: {
@@ -167,10 +202,32 @@ export const confirmPayment = async (req, res) => {
       }
     });
 
+    // Send invoice email
+    try {
+      const user = await User.findById(userId).select('email firstName lastName');
+      const emailResult = await sendInvoiceEmail(transaction, user, plan);
+      
+      if (emailResult.success) {
+        // Update transaction with email sent status
+        await Transaction.findByIdAndUpdate(transaction._id, {
+          invoiceSent: true,
+          invoiceSentAt: new Date()
+        });
+        console.log('Invoice email sent successfully');
+      } else {
+        console.log('Failed to send invoice email:', emailResult.message);
+      }
+    } catch (emailError) {
+      console.error('Error sending invoice email:', emailError);
+    }
+
     res.status(200).json({
       success: true,
       message: "Subscription created successfully",
-      data: userMembership
+      data: {
+        subscription: userMembership,
+        transaction: transaction
+      }
     });
   } catch (error) {
     console.error("Confirm payment error:", error);
@@ -314,6 +371,99 @@ export const handleWebhook = async (req, res) => {
 
     // Handle the event
     switch (event.type) {
+      case 'checkout.session.completed':
+        const session = event.data.object;
+        console.log('Checkout session completed:', session.id);
+        
+        // Create subscription and transaction
+        try {
+          const { userId, planId } = session.metadata;
+          const plan = await MembershipPlan.findById(planId);
+          
+          if (plan) {
+            // Calculate subscription dates
+            const startDate = new Date();
+            let endDate = new Date();
+            
+            if (plan.duration === 'monthly') {
+              endDate.setMonth(endDate.getMonth() + 1);
+            } else if (plan.duration === 'quarterly') {
+              endDate.setMonth(endDate.getMonth() + 3);
+            } else if (plan.duration === 'yearly') {
+              endDate.setFullYear(endDate.getFullYear() + 1);
+            }
+
+            // Create subscription
+            const userMembership = new UserMembership({
+              user: userId,
+              plan: planId,
+              startDate,
+              endDate,
+              isActive: true,
+              paymentIntentId: session.payment_intent,
+              profileViewsUsed: 0,
+              interestsUsed: 0,
+              shortlistsUsed: 0,
+              contactViewsUsed: 0
+            });
+
+            await userMembership.save();
+
+            // Create transaction record
+            const transaction = new Transaction({
+              user: userId,
+              plan: planId,
+              subscription: userMembership._id,
+              paymentIntentId: session.payment_intent,
+              stripeChargeId: session.payment_intent,
+              amount: plan.price,
+              currency: 'INR',
+              status: 'succeeded',
+              paymentMethod: 'card',
+              description: `${plan.name} Plan Subscription (${plan.duration})`,
+              receiptUrl: session.receipt_url
+            });
+
+            await transaction.save();
+
+            // Update user's membership reference
+            await User.findByIdAndUpdate(userId, {
+              membership: {
+                plan: planId,
+                startDate,
+                endDate,
+                isActive: true
+              }
+            });
+
+            // Send invoice email
+            try {
+              const user = await User.findById(userId).select('email firstName lastName');
+              if (user) {
+                const emailResult = await sendInvoiceEmail(transaction, user, plan);
+                
+                if (emailResult.success) {
+                  await Transaction.findByIdAndUpdate(transaction._id, {
+                    invoiceSent: true,
+                    invoiceSentAt: new Date()
+                  });
+                  console.log('Invoice email sent successfully to:', user.email);
+                } else {
+                  console.log('Email sending failed:', emailResult.message);
+                }
+              } else {
+                console.log('User not found for email sending');
+              }
+            } catch (emailError) {
+              console.error('Error sending invoice email:', emailError);
+            }
+
+            console.log('Subscription created successfully via webhook');
+          }
+        } catch (error) {
+          console.error('Error processing checkout session completion:', error);
+        }
+        break;
       case 'payment_intent.succeeded':
         const paymentIntent = event.data.object;
         console.log('PaymentIntent succeeded:', paymentIntent.id);
@@ -361,6 +511,359 @@ export const getSubscriptionPlans = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Server error while fetching subscription plans",
+      error: error.message
+    });
+  }
+};
+
+// Get all transactions (admin endpoint)
+export const getAllTransactions = async (req, res) => {
+  try {
+    const { 
+      page = 1, 
+      limit = 10, 
+      status, 
+      startDate, 
+      endDate,
+      search 
+    } = req.query;
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    // Build query
+    let query = {};
+    
+    if (status) {
+      query.status = status;
+    }
+    
+    if (startDate || endDate) {
+      query.createdAt = {};
+      if (startDate) {
+        query.createdAt.$gte = new Date(startDate);
+      }
+      if (endDate) {
+        query.createdAt.$lte = new Date(endDate);
+      }
+    }
+    
+    if (search) {
+      query.$or = [
+        { paymentIntentId: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const transactions = await Transaction.find(query)
+      .populate('user', 'firstName lastName email phone')
+      .populate('plan', 'name price duration')
+      .populate('subscription', 'startDate endDate isActive')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await Transaction.countDocuments(query);
+
+    // Calculate summary statistics
+    const totalRevenue = await Transaction.aggregate([
+      { $match: { status: 'succeeded' } },
+      { $group: { _id: null, total: { $sum: '$amount' } } }
+    ]);
+
+    const monthlyRevenue = await Transaction.aggregate([
+      {
+        $match: {
+          status: 'succeeded',
+          createdAt: {
+            $gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+          }
+        }
+      },
+      { $group: { _id: null, total: { $sum: '$amount' } } }
+    ]);
+
+    res.status(200).json({
+      success: true,
+      message: "Transactions retrieved successfully",
+      data: {
+        transactions,
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages: Math.ceil(total / parseInt(limit)),
+          totalTransactions: total,
+          hasNext: skip + transactions.length < total,
+          hasPrev: parseInt(page) > 1
+        },
+        summary: {
+          totalRevenue: totalRevenue[0]?.total || 0,
+          monthlyRevenue: monthlyRevenue[0]?.total || 0,
+          totalTransactions: total
+        }
+      }
+    });
+  } catch (error) {
+    console.error("Get transactions error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while fetching transactions",
+      error: error.message
+    });
+  }
+};
+
+// Get transaction by ID (admin endpoint)
+export const getTransactionById = async (req, res) => {
+  try {
+    const { transactionId } = req.params;
+
+    const transaction = await Transaction.findById(transactionId)
+      .populate('user', 'firstName lastName email phone')
+      .populate('plan', 'name price duration features')
+      .populate('subscription', 'startDate endDate isActive');
+
+    if (!transaction) {
+      return res.status(404).json({
+        success: false,
+        message: "Transaction not found"
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Transaction retrieved successfully",
+      data: transaction
+    });
+  } catch (error) {
+    console.error("Get transaction by ID error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while fetching transaction",
+      error: error.message
+    });
+  }
+};
+
+// Get checkout session details for payment success page
+export const getCheckoutSessionDetails = async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const userId = req.user.id;
+
+    // Retrieve session from Stripe
+    const stripeInstance = getStripe();
+    const session = await stripeInstance.checkout.sessions.retrieve(sessionId);
+
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        message: "Checkout session not found"
+      });
+    }
+
+    // Get plan details from metadata
+    const { planId } = session.metadata;
+    const plan = await MembershipPlan.findById(planId);
+
+    if (!plan) {
+      return res.status(404).json({
+        success: false,
+        message: "Plan not found"
+      });
+    }
+
+    // Get transaction details if available
+    const transaction = await Transaction.findOne({ paymentIntentId: session.payment_intent })
+      .populate('plan', 'name price duration features');
+
+    // If payment is completed but no transaction exists, create one
+    if (session.payment_status === 'paid' && !transaction) {
+      try {
+        await processCompletedPayment(session, userId, planId);
+        // Refetch transaction after creating it
+        const newTransaction = await Transaction.findOne({ paymentIntentId: session.payment_intent })
+          .populate('plan', 'name price duration features');
+        
+        res.status(200).json({
+          success: true,
+          message: "Checkout session details retrieved successfully",
+          data: {
+            sessionId: session.id,
+            amount: session.amount_total / 100, // Convert from cents
+            currency: session.currency,
+            paymentStatus: session.payment_status,
+            plan: plan,
+            transaction: newTransaction,
+            customerEmail: session.customer_email,
+            receiptUrl: session.receipt_url
+          }
+        });
+        return;
+      } catch (processError) {
+        console.error("Error processing completed payment:", processError);
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Checkout session details retrieved successfully",
+      data: {
+        sessionId: session.id,
+        amount: session.amount_total / 100, // Convert from cents
+        currency: session.currency,
+        paymentStatus: session.payment_status,
+        plan: plan,
+        transaction: transaction,
+        customerEmail: session.customer_email,
+        receiptUrl: session.receipt_url
+      }
+    });
+  } catch (error) {
+    console.error("Get checkout session details error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while retrieving checkout session details",
+      error: error.message
+    });
+  }
+};
+
+// Helper function to process completed payment
+const processCompletedPayment = async (session, userId, planId) => {
+  const plan = await MembershipPlan.findById(planId);
+  
+  if (!plan) {
+    throw new Error("Plan not found");
+  }
+
+  // Calculate subscription dates
+  const startDate = new Date();
+  let endDate = new Date();
+  
+  if (plan.duration === 'monthly') {
+    endDate.setMonth(endDate.getMonth() + 1);
+  } else if (plan.duration === 'quarterly') {
+    endDate.setMonth(endDate.getMonth() + 3);
+  } else if (plan.duration === 'yearly') {
+    endDate.setFullYear(endDate.getFullYear() + 1);
+  }
+
+  // Create subscription
+  const userMembership = new UserMembership({
+    user: userId,
+    plan: planId,
+    startDate,
+    endDate,
+    isActive: true,
+    paymentIntentId: session.payment_intent,
+    profileViewsUsed: 0,
+    interestsUsed: 0,
+    shortlistsUsed: 0,
+    contactViewsUsed: 0
+  });
+
+  await userMembership.save();
+
+  // Create transaction record
+  const transaction = new Transaction({
+    user: userId,
+    plan: planId,
+    subscription: userMembership._id,
+    paymentIntentId: session.payment_intent,
+    stripeChargeId: session.payment_intent,
+    amount: plan.price,
+    currency: 'INR',
+    status: 'succeeded',
+    paymentMethod: 'card',
+    description: `${plan.name} Plan Subscription (${plan.duration})`,
+    receiptUrl: session.receipt_url
+  });
+
+  await transaction.save();
+
+  // Update user's membership reference
+  await User.findByIdAndUpdate(userId, {
+    membership: {
+      plan: planId,
+      startDate,
+      endDate,
+      isActive: true
+    }
+  });
+
+  // Send invoice email
+  try {
+    const user = await User.findById(userId).select('email firstName lastName');
+    if (user) {
+      const emailResult = await sendInvoiceEmail(transaction, user, plan);
+      
+      if (emailResult.success) {
+        await Transaction.findByIdAndUpdate(transaction._id, {
+          invoiceSent: true,
+          invoiceSentAt: new Date()
+        });
+        console.log('Invoice email sent successfully to:', user.email);
+      } else {
+        console.log('Email sending failed:', emailResult.message);
+      }
+    } else {
+      console.log('User not found for email sending');
+    }
+  } catch (emailError) {
+    console.error('Error sending invoice email:', emailError);
+  }
+
+  console.log('Payment processed successfully for session:', session.id);
+  return transaction;
+};
+
+// Manual payment processing endpoint for testing
+export const processPaymentManually = async (req, res) => {
+  try {
+    const { sessionId } = req.body;
+    const userId = req.user.id;
+
+    // Retrieve session from Stripe
+    const stripeInstance = getStripe();
+    const session = await stripeInstance.checkout.sessions.retrieve(sessionId);
+
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        message: "Checkout session not found"
+      });
+    }
+
+    if (session.payment_status !== 'paid') {
+      return res.status(400).json({
+        success: false,
+        message: "Payment not completed yet"
+      });
+    }
+
+    // Check if already processed
+    const existingTransaction = await Transaction.findOne({ paymentIntentId: session.payment_intent });
+    if (existingTransaction) {
+      return res.status(200).json({
+        success: true,
+        message: "Payment already processed",
+        data: existingTransaction
+      });
+    }
+
+    // Process the payment
+    const { planId } = session.metadata;
+    const transaction = await processCompletedPayment(session, userId, planId);
+
+    res.status(200).json({
+      success: true,
+      message: "Payment processed successfully",
+      data: transaction
+    });
+  } catch (error) {
+    console.error("Manual payment processing error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while processing payment",
       error: error.message
     });
   }

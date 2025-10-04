@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BandhanM Subscription Invoice</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background: linear-gradient(135deg, #d81b60 0%, #ad1457 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+            border-radius: 10px 10px 0 0;
+        }
+        .content {
+            background: #f9f9f9;
+            padding: 30px;
+            border-radius: 0 0 10px 10px;
+        }
+        .invoice-details {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .amount {
+            font-size: 24px;
+            font-weight: bold;
+            color: #d81b60;
+        }
+        .plan-name {
+            font-size: 20px;
+            font-weight: bold;
+            color: #333;
+            margin: 10px 0;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            color: #666;
+        }
+        .button {
+            display: inline-block;
+            background: #d81b60;
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎉 Payment Successful!</h1>
+        <p>Thank you for subscribing to BandhanM</p>
+    </div>
+    
+    <div class="content">
+        <h2>Dear {{userName}},</h2>
+        
+        <p>Your subscription has been successfully processed! Welcome to the BandhanM family.</p>
+        
+        <div class="invoice-details">
+            <h3>Invoice Details</h3>
+            <div class="plan-name">{{planName}} Plan</div>
+            <p><strong>Duration:</strong> {{planDuration}}</p>
+            <p><strong>Amount Paid:</strong> <span class="amount">{{amount}}</span></p>
+            <p><strong>Transaction ID:</strong> {{transactionId}}</p>
+            <p><strong>Date:</strong> {{transactionDate}}</p>
+            <p><strong>Status:</strong> ✅ Completed</p>
+        </div>
+        
+        <h3>What's Next?</h3>
+        <ul>
+            <li>Your subscription is now active</li>
+            <li>You can access all premium features</li>
+            <li>Your profile has been upgraded</li>
+            <li>You can now view and contact other premium members</li>
+        </ul>
+        
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="{{receiptLink}}" class="button">View Full Receipt</a>
+        </div>
+        
+        <p>If you have any questions or need assistance, please don't hesitate to contact our support team.</p>
+        
+        <div class="footer">
+            <p>Best regards,<br>The BandhanM Team</p>
+            <p><a href="{{frontendUrl}}">Visit BandhanM</a></p>
+        </div>
+    </div>
+</body>
+</html>

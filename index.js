@@ -97,10 +97,10 @@ io.on("connection", (socket) => {
 });
 
 // Admin routes with admin rate limiting
-app.use("/api/admin", adminLimiter, adminRoutes);
-app.use("/api/admin/membership", adminLimiter, membershipRoutes);
-app.use("/api/admin/panel", adminLimiter, adminPanelRoutes);
-app.use("/api/membership", adminLimiter, subscriptionManagementRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/admin/membership", membershipRoutes);
+app.use("/api/admin/panel", adminPanelRoutes);
+app.use("/api/membership", subscriptionManagementRoutes);
 
 // Auth routes with auth rate limiting authLimiter
 app.use('/api/auth', authRoutes);
