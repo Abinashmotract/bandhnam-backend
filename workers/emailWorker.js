@@ -60,13 +60,13 @@ const sendNotificationEmail = async (notification) => {
       emailSubject = "Someone liked your profile!";
       emailHtml = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #d81b60;">Someone liked your profile!</h2>
+          <h2 style="color: #51365F;">Someone liked your profile!</h2>
           <p>Hello ${user.name},</p>
           <p>Great news! Someone liked your profile on Bandhnam Nammatch.</p>
           <p>Log in to see who it was and start a conversation!</p>
           <div style="text-align: center; margin: 30px 0;">
             <a href="${process.env.FRONTEND_URL || "http://localhost:5173"}/login" 
-               style="background-color: #d81b60; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
+               style="background-color: #51365F; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
               View Profile
             </a>
           </div>
@@ -79,13 +79,13 @@ const sendNotificationEmail = async (notification) => {
       emailSubject = "Someone super liked your profile!";
       emailHtml = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #d81b60;">Someone super liked your profile!</h2>
+          <h2 style="color: #51365F;">Someone super liked your profile!</h2>
           <p>Hello ${user.name},</p>
           <p>Amazing! Someone super liked your profile on Bandhnam Nammatch.</p>
           <p>This is special - log in to see who it was!</p>
           <div style="text-align: center; margin: 30px 0;">
             <a href="${process.env.FRONTEND_URL || "http://localhost:5173"}/login" 
-               style="background-color: #d81b60; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
+               style="background-color: #51365F; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
               View Profile
             </a>
           </div>
@@ -98,13 +98,13 @@ const sendNotificationEmail = async (notification) => {
       emailSubject = "It's a Match!";
       emailHtml = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #d81b60;">It's a Match! 🎉</h2>
+          <h2 style="color: #51365F;">It's a Match! 🎉</h2>
           <p>Hello ${user.name},</p>
           <p>Congratulations! You have a new match on Bandhnam Nammatch.</p>
           <p>You both liked each other - time to start a conversation!</p>
           <div style="text-align: center; margin: 30px 0;">
             <a href="${process.env.FRONTEND_URL || "http://localhost:5173"}/matches" 
-               style="background-color: #d81b60; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
+               style="background-color: #51365F; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
               View Match
             </a>
           </div>
@@ -117,13 +117,13 @@ const sendNotificationEmail = async (notification) => {
       emailSubject = "New Message";
       emailHtml = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #d81b60;">New Message</h2>
+          <h2 style="color: #51365F;">New Message</h2>
           <p>Hello ${user.name},</p>
           <p>You have received a new message on Bandhnam Nammatch.</p>
           <p>Log in to read and reply!</p>
           <div style="text-align: center; margin: 30px 0;">
             <a href="${process.env.FRONTEND_URL || "http://localhost:5173"}/messages" 
-               style="background-color: #d81b60; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
+               style="background-color: #51365F; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
               View Messages
             </a>
           </div>
@@ -136,12 +136,12 @@ const sendNotificationEmail = async (notification) => {
       emailSubject = "Verification Update";
       emailHtml = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #d81b60;">Verification Update</h2>
+          <h2 style="color: #51365F;">Verification Update</h2>
           <p>Hello ${user.name},</p>
           <p>${message}</p>
           <div style="text-align: center; margin: 30px 0;">
             <a href="${process.env.FRONTEND_URL || "http://localhost:5173"}/profile" 
-               style="background-color: #d81b60; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
+               style="background-color: #51365F; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
               View Profile
             </a>
           </div>
@@ -154,12 +154,12 @@ const sendNotificationEmail = async (notification) => {
       emailSubject = title;
       emailHtml = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #d81b60;">${title}</h2>
+          <h2 style="color: #51365F;">${title}</h2>
           <p>Hello ${user.name},</p>
           <p>${message}</p>
           <div style="text-align: center; margin: 30px 0;">
             <a href="${process.env.FRONTEND_URL || "http://localhost:5173"}" 
-               style="background-color: #d81b60; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
+               style="background-color: #51365F; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
               Visit Site
             </a>
           </div>
@@ -172,7 +172,7 @@ const sendNotificationEmail = async (notification) => {
       emailSubject = title;
       emailHtml = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #d81b60;">${title}</h2>
+          <h2 style="color: #51365F;">${title}</h2>
           <p>Hello ${user.name},</p>
           <p>${message}</p>
           <p>Best regards,<br>Bandhnam Nammatch Team</p>
@@ -220,7 +220,7 @@ const sendWelcomeEmail = async (user) => {
 
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <h2 style="color: #d81b60;">Welcome to Bandhnam Nammatch!</h2>
+      <h2 style="color: #51365F;">Welcome to Bandhnam Nammatch!</h2>
       <p>Hello ${name},</p>
       <p>Thank you for registering with Bandhnam Nammatch - your journey to find the perfect partner begins now!</p>
       <p><strong>Your registration details:</strong></p>
@@ -233,7 +233,7 @@ const sendWelcomeEmail = async (user) => {
       <p>We're excited to help you find your perfect match. Complete your profile to get started!</p>
       <div style="text-align: center; margin: 30px 0;">
         <a href="${process.env.FRONTEND_URL || "http://localhost:5173"}/profile" 
-           style="background-color: #d81b60; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
+           style="background-color: #51365F; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
           Complete Profile
         </a>
       </div>
@@ -282,12 +282,12 @@ const sendPasswordResetEmail = async (user) => {
 
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <h2 style="color: #d81b60;">Password Reset Request</h2>
+      <h2 style="color: #51365F;">Password Reset Request</h2>
       <p>Hello ${user.name},</p>
       <p>You requested to reset your password. Click the button below to reset it:</p>
       <div style="text-align: center; margin: 30px 0;">
         <a href="${resetUrl}" 
-           style="background-color: #d81b60; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
+           style="background-color: #51365F; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
           Reset Password
         </a>
       </div>

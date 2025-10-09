@@ -188,7 +188,8 @@ export const updateUser = async (req, res) => {
       role,
       banReason,
       banExpiry,
-      notes
+      notes,
+      profileImage
     } = req.body;
 
     const user = await User.findById(userId);
@@ -207,6 +208,7 @@ export const updateUser = async (req, res) => {
     if (banReason) user.banReason = banReason;
     if (banExpiry) user.banExpiry = new Date(banExpiry);
     if (notes) user.adminNotes = notes;
+    if (profileImage) user.profileImage = profileImage;
 
     await user.save();
 

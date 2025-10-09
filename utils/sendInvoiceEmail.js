@@ -45,7 +45,7 @@ const generateInvoiceHTML = (transaction, user, plan) => {
                 overflow: hidden;
             }
             .header {
-                background: linear-gradient(135deg, #d81b60 0%, #880e4f 100%);
+                background: #51365F;
                 color: white;
                 padding: 30px;
                 text-align: center;
@@ -79,7 +79,7 @@ const generateInvoiceHTML = (transaction, user, plan) => {
                 border-bottom: none;
                 font-weight: bold;
                 font-size: 18px;
-                color: #d81b60;
+                color: #51365F;
             }
             .detail-label {
                 color: #6c757d;
@@ -93,7 +93,7 @@ const generateInvoiceHTML = (transaction, user, plan) => {
                 margin: 20px 0;
             }
             .plan-features h3 {
-                color: #d81b60;
+                color: #51365F;
                 margin-bottom: 15px;
             }
             .features-list {
@@ -130,7 +130,7 @@ const generateInvoiceHTML = (transaction, user, plan) => {
             }
             .cta-button {
                 display: inline-block;
-                background: linear-gradient(135deg, #d81b60 0%, #880e4f 100%);
+                background: #51365F;
                 color: white;
                 padding: 12px 30px;
                 text-decoration: none;

@@ -456,11 +456,11 @@ export const forgotPassword = async (req, res) => {
         await user.save();
         const html = `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h2 style="color: #d81b60;">Password Reset Request</h2>
+                <h2 style="color: #51365F;">Password Reset Request</h2>
                 <p>Hello ${user.name},</p>
                 <p>You requested to reset your password. Use the OTP below to proceed:</p>
                 <div style="background-color: #f8bbd0; padding: 15px; text-align: center; margin: 20px 0; border-radius: 5px;">
-                    <h1 style="margin: 0; color: #d81b60; letter-spacing: 5px;">${otp}</h1>
+                    <h1 style="margin: 0; color: #51365F; letter-spacing: 5px;">${otp}</h1>
                 </div>
                 <p>This OTP will expire in 10 minutes.</p>
                 <p>If you didn't request this reset, please ignore this email.</p>
@@ -512,11 +512,11 @@ export const resendOtp = async (req, res) => {
 
         const html = `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h2 style="color: #d81b60;">New OTP for Password Reset</h2>
+                <h2 style="color: #51365F;">New OTP for Password Reset</h2>
                 <p>Hello ${user.name},</p>
                 <p>Your new OTP is:</p>
                 <div style="background-color: #f8bbd0; padding: 15px; text-align: center; margin: 20px 0; border-radius: 5px;">
-                    <h1 style="margin: 0; color: #d81b60; letter-spacing: 5px;">${newOtp}</h1>
+                    <h1 style="margin: 0; color: #51365F; letter-spacing: 5px;">${newOtp}</h1>
                 </div>
                 <p>This OTP will expire in 10 minutes.</p>
                 <br />
@@ -556,7 +556,7 @@ export const verifyOtp = async (req, res) => {
         // Optional: send confirmation email that OTP verified
         const html = `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h2 style="color: #d81b60;">OTP Verified Successfully</h2>
+                <h2 style="color: #51365F;">OTP Verified Successfully</h2>
                 <p>Hello ${user.name},</p>
                 <p>Your OTP has been verified. You can now reset your password.</p>
                 <br />
@@ -621,7 +621,7 @@ export const resetPassword = async (req, res) => {
 
         const html = `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h2 style="color: #d81b60;">Password Reset Successful</h2>
+                <h2 style="color: #51365F;">Password Reset Successful</h2>
                 <p>Hello ${user.name},</p>
                 <p>Your password has been successfully reset.</p>
                 <br />
