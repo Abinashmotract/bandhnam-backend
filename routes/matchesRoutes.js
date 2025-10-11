@@ -1,18 +1,20 @@
 import express from "express";
 import {
-  getAllMatches,
-  getMatchDetails,
-  updateMatchStatus,
-  getMatchAnalytics
+  getMatches,
+  showInterest,
+  showSuperInterest,
+  getInterestLimits,
+  getMutualMatches
 } from "../controllers/matchesController.js";
-import { VerifyAdmin } from "../middlewares/authMiddleware.js";
+import { VerifyToken } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
-// Matches & Connections routes
-router.get("/", VerifyAdmin, getAllMatches);
-router.get("/:matchId", VerifyAdmin, getMatchDetails);
-router.patch("/:matchId/status", VerifyAdmin, updateMatchStatus);
-router.get("/analytics/overview", VerifyAdmin, getMatchAnalytics);
+// Matches routes
+router.get("/", VerifyToken, getMatches);
+router.get("/mutual", VerifyToken, getMutualMatches);
+router.post("/interest", VerifyToken, showInterest);
+router.post("/super-interest", VerifyToken, showSuperInterest);
+router.get("/limits", VerifyToken, getInterestLimits);
 
 export default router;

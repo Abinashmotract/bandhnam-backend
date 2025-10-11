@@ -27,9 +27,11 @@ import MembershipPlan from "./routes/usersMembershipRoutes.js";
 import matchesRoutes from "./routes/matchesRoutes.js";
 import messagesRoutes from "./routes/messagesRoutes.js";
 import adminVerificationRoutes from "./routes/verificationRoutes.js";
+import userVerificationRoutes from "./routes/userVerificationRoutes.js";
 import adminAnalyticsRoutes from "./routes/analyticsRoutes.js";
 import successStoriesRoutes from "./routes/successStoriesRoutes.js";
 import systemSettingsRoutes from "./routes/systemSettingsRoutes.js";
+import seedRoutes from "./routes/seedRoutes.js";
 
 // Import middleware
 import { generalLimiter, authLimiter, otpLimiter, searchLimiter, messageLimiter, adminLimiter } from "./middlewares/rateLimiter.js";
@@ -97,10 +99,10 @@ io.on("connection", (socket) => {
 });
 
 // Admin routes with admin rate limiting
-app.use("/api/admin", adminRoutes);
-app.use("/api/admin/membership", membershipRoutes);
-app.use("/api/admin/panel", adminPanelRoutes);
-app.use("/api/membership", subscriptionManagementRoutes);
+app.use("/api/admin", adminLimiter, adminRoutes);
+app.use("/api/admin/membership", adminLimiter, membershipRoutes);
+app.use("/api/admin/panel", adminLimiter, adminPanelRoutes);
+app.use("/api/membership", adminLimiter, subscriptionManagementRoutes);
 
 // Auth routes with auth rate limiting authLimiter
 app.use('/api/auth', authRoutes);
@@ -119,7 +121,10 @@ app.use("/api/interactions", interactionRoutes);
 app.use("/api/chat", messageLimiter, messagingRoutes);
 
 // Verification routes
-app.use("/api/verify", adminVerificationRoutes);
+app.use("/api/verify", userVerificationRoutes);
+
+// Matches routes
+app.use("/api/matches", matchesRoutes);
 
 // Notification routes
 app.use("/api/notifications", notificationRoutes);
@@ -142,6 +147,9 @@ app.use("/api/admin/verification", adminLimiter, adminVerificationRoutes);
 app.use("/api/admin/analytics", adminLimiter, adminAnalyticsRoutes);
 app.use("/api/admin/success-stories", adminLimiter, successStoriesRoutes);
 app.use("/api/admin/settings", adminLimiter, systemSettingsRoutes);
+
+// Seed data routes
+app.use("/api/seed", seedRoutes);
 
 server.listen(process.env.PORT, () => {
   console.log(`Server running on port ${process.env.PORT}`);

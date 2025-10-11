@@ -1,60 +1,199 @@
 import User from "../models/User.js";
 import Interaction from "../models/Interaction.js";
+import mongoose from "mongoose";
 
-// Get all matches and connections
-export const getAllMatches = async (req, res) => {
+// Get matches for a user
+export const getMatches = async (req, res) => {
   try {
-    const { page = 1, limit = 20, status, type } = req.query;
-    
-    let query = { type: { $in: ['like', 'interest', 'shortlist'] } };
-    
-    if (status) {
-      query.status = status;
+    const userId = req.user.id;
+    const {
+      page = 1,
+      limit = 20,
+      search = '',
+      verified = false,
+      nearby = false,
+      justJoined = false,
+      ageMin = 18,
+      ageMax = 60,
+      religion = '',
+      caste = '',
+      occupation = '',
+      location = '',
+      sortBy = 'recentlyJoined'
+    } = req.query;
+
+    // Get current user's preferences for matching
+    const currentUser = await User.findById(userId).select('preferences location gender');
+    if (!currentUser) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
     }
-    
-    if (type) {
-      query.type = type;
+
+    // Build match query
+    let matchQuery = {
+      _id: { $ne: userId }, // Exclude current user
+      isActive: true,
+      profileCompletion: { $gte: 50 } // Only show profiles with decent completion
+    };
+
+    // Gender preference (opposite gender for heterosexual matches)
+    if (currentUser.gender === 'male') {
+      matchQuery.gender = 'female';
+    } else if (currentUser.gender === 'female') {
+      matchQuery.gender = 'male';
     }
+
+    // Age filter
+    const currentDate = new Date();
+    const maxBirthDate = new Date(currentDate.getFullYear() - ageMin, currentDate.getMonth(), currentDate.getDate());
+    const minBirthDate = new Date(currentDate.getFullYear() - ageMax, currentDate.getMonth(), currentDate.getDate());
     
+    matchQuery.dob = {
+      $gte: minBirthDate,
+      $lte: maxBirthDate
+    };
+
+    // Additional filters
+    if (verified === 'true') {
+      matchQuery.isEmailVerified = true;
+    }
+
+    if (religion) {
+      matchQuery.religion = religion;
+    }
+
+    if (caste) {
+      matchQuery.caste = caste;
+    }
+
+    if (occupation) {
+      matchQuery.occupation = { $regex: occupation, $options: 'i' };
+    }
+
+    if (location) {
+      matchQuery.$or = [
+        { city: { $regex: location, $options: 'i' } },
+        { state: { $regex: location, $options: 'i' } },
+        { location: { $regex: location, $options: 'i' } }
+      ];
+    }
+
+    // Search filter
+    if (search) {
+      matchQuery.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { occupation: { $regex: search, $options: 'i' } },
+        { city: { $regex: search, $options: 'i' } },
+        { state: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    // Calculate skip value for pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    
-    const matches = await Interaction.find(query)
-      .populate("fromUser", "name email profileImage")
-      .populate("toUser", "name email profileImage")
-      .sort({ createdAt: -1 })
+
+    // Build sort object
+    let sortObj = {};
+    switch (sortBy) {
+      case 'name':
+        sortObj = { name: 1 };
+        break;
+      case 'recentlyJoined':
+        sortObj = { createdAt: -1 };
+        break;
+      case 'verified':
+        sortObj = { isEmailVerified: -1, createdAt: -1 };
+        break;
+      case 'matchScore':
+        // For now, sort by profile completion
+        sortObj = { profileCompletion: -1, createdAt: -1 };
+        break;
+      default:
+        sortObj = { createdAt: -1 };
+    }
+
+    // Get matches with pagination
+    const matches = await User.find(matchQuery)
+      .select('-password -otp -otpExpiry -emailVerificationToken -phoneVerificationOTP')
+      .sort(sortObj)
       .skip(skip)
       .limit(parseInt(limit));
-    
-    const total = await Interaction.countDocuments(query);
-    
-    // Get match statistics
-    const stats = await Interaction.aggregate([
-      { $match: { type: { $in: ['like', 'interest', 'shortlist'] } } },
-      {
-        $group: {
-          _id: "$type",
-          count: { $sum: 1 }
-        }
-      }
-    ]);
-    
+
+    // Get total count for pagination
+    const totalMatches = await User.countDocuments(matchQuery);
+
+    // Get user's interactions to show interest status
+    const userInteractions = await Interaction.find({
+      fromUser: userId,
+      type: { $in: ['interest', 'super_interest'] }
+    }).select('toUser type');
+
+    // Create a map of interactions for quick lookup
+    const interactionsMap = {};
+    userInteractions.forEach(interaction => {
+      interactionsMap[interaction.toUser.toString()] = interaction.type;
+    });
+
+    // Add interaction status and calculate match score
+    const enrichedMatches = matches.map(match => {
+      const age = match.dob ? 
+        new Date().getFullYear() - new Date(match.dob).getFullYear() : null;
+      
+      // Calculate distance (simplified - in real app, use proper geolocation)
+      const distance = match.location && currentUser.location ? 
+        Math.floor(Math.random() * 50) + 1 : null;
+
+      // Calculate match score based on various factors
+      let matchScore = 50; // Base score
+      
+      if (match.isEmailVerified) matchScore += 10;
+      if (match.isPhoneVerified) matchScore += 10;
+      if (match.profileCompletion >= 80) matchScore += 15;
+      if (match.profileCompletion >= 90) matchScore += 10;
+      
+      // Add some randomness for variety
+      matchScore += Math.floor(Math.random() * 20);
+      matchScore = Math.min(matchScore, 100);
+
+      return {
+        ...match.toObject(),
+        age,
+        distance: distance ? `${distance} km` : null,
+        isNearby: distance && distance <= 10,
+        isJustJoined: new Date() - new Date(match.createdAt) < 7 * 24 * 60 * 60 * 1000, // 7 days
+        matchScore,
+        hasShownInterest: interactionsMap[match._id.toString()] === 'interest',
+        hasShownSuperInterest: interactionsMap[match._id.toString()] === 'super_interest'
+      };
+    });
+
+    // Apply additional filters that require processing
+    let filteredMatches = enrichedMatches;
+
+    if (nearby === 'true') {
+      filteredMatches = filteredMatches.filter(match => match.isNearby);
+    }
+
+    if (justJoined === 'true') {
+      filteredMatches = filteredMatches.filter(match => match.isJustJoined);
+    }
+
     res.status(200).json({
       success: true,
       message: "Matches retrieved successfully",
-      data: {
-        matches,
-        stats,
-        pagination: {
-          currentPage: parseInt(page),
-          totalPages: Math.ceil(total / parseInt(limit)),
-          totalMatches: total,
-          hasNext: skip + matches.length < total,
-          hasPrev: parseInt(page) > 1
-        }
+      data: filteredMatches,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(totalMatches / parseInt(limit)),
+        totalMatches,
+        hasNext: skip + filteredMatches.length < totalMatches,
+        hasPrev: parseInt(page) > 1
       }
     });
+
   } catch (error) {
-    console.error("Get all matches error:", error);
+    console.error("Get matches error:", error);
     res.status(500).json({
       success: false,
       message: "Server error while fetching matches",
@@ -63,122 +202,305 @@ export const getAllMatches = async (req, res) => {
   }
 };
 
-// Get match details
-export const getMatchDetails = async (req, res) => {
+// Show interest in a profile
+export const showInterest = async (req, res) => {
   try {
-    const { matchId } = req.params;
-    
-    const match = await Interaction.findById(matchId)
-      .populate("fromUser", "name email profileImage phoneNumber dob location")
-      .populate("toUser", "name email profileImage phoneNumber dob location");
-    
-    if (!match) {
-      return res.status(404).json({
+    const { profileId } = req.body;
+    const fromUserId = req.user.id;
+
+    if (!profileId) {
+      return res.status(400).json({
         success: false,
-        message: "Match not found"
+        message: "Profile ID is required"
       });
     }
-    
-    res.status(200).json({
-      success: true,
-      message: "Match details retrieved successfully",
-      data: match
-    });
-  } catch (error) {
-    console.error("Get match details error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Server error while fetching match details",
-      error: error.message
-    });
-  }
-};
 
-// Update match status
-export const updateMatchStatus = async (req, res) => {
-  try {
-    const { matchId } = req.params;
-    const { status } = req.body;
-    
-    const match = await Interaction.findById(matchId);
-    if (!match) {
-      return res.status(404).json({
+    if (profileId === fromUserId) {
+      return res.status(400).json({
         success: false,
-        message: "Match not found"
+        message: "Cannot show interest in your own profile"
       });
     }
-    
-    match.status = status;
-    await match.save();
-    
-    res.status(200).json({
-      success: true,
-      message: "Match status updated successfully",
-      data: match
-    });
-  } catch (error) {
-    console.error("Update match status error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Server error while updating match status",
-      error: error.message
-    });
-  }
-};
 
-// Get match analytics
-export const getMatchAnalytics = async (req, res) => {
-  try {
-    const { startDate, endDate } = req.query;
-    
-    let dateFilter = {};
-    if (startDate && endDate) {
-      dateFilter.createdAt = {
-        $gte: new Date(startDate),
-        $lte: new Date(endDate)
-      };
+    // Check if profile exists
+    const targetProfile = await User.findById(profileId);
+    if (!targetProfile) {
+      return res.status(404).json({
+        success: false,
+        message: "Profile not found"
+      });
     }
+
+    // Check if interest already exists
+    const existingInterest = await Interaction.findOne({
+      fromUser: fromUserId,
+      toUser: profileId,
+      type: 'interest'
+    });
+
+    if (existingInterest) {
+      return res.status(400).json({
+        success: false,
+        message: "Interest already shown"
+      });
+    }
+
+    // Check user's interest limits
+    const user = await User.findById(fromUserId);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     
-    // Match statistics
-    const matchStats = await Interaction.aggregate([
-      { $match: { type: { $in: ['like', 'interest', 'shortlist'] }, ...dateFilter } },
-      {
-        $group: {
-          _id: "$type",
-          count: { $sum: 1 }
-        }
-      }
-    ]);
-    
-    // Daily match trends
-    const dailyTrends = await Interaction.aggregate([
-      { $match: { type: { $in: ['like', 'interest', 'shortlist'] }, ...dateFilter } },
-      {
-        $group: {
-          _id: {
-            year: { $year: "$createdAt" },
-            month: { $month: "$createdAt" },
-            day: { $dayOfMonth: "$createdAt" }
-          },
-          count: { $sum: 1 }
-        }
-      },
-      { $sort: { "_id.year": 1, "_id.month": 1, "_id.day": 1 } }
-    ]);
-    
+    const todayInterests = await Interaction.countDocuments({
+      fromUser: fromUserId,
+      type: 'interest',
+      createdAt: { $gte: today }
+    });
+
+    // Check if user has premium membership for unlimited interests
+    const hasUnlimitedInterests = user.membership && 
+      user.membership.plan && 
+      user.membership.isActive;
+
+    if (!hasUnlimitedInterests && todayInterests >= 5) {
+      return res.status(400).json({
+        success: false,
+        message: "Daily interest limit reached. Upgrade to premium for unlimited interests.",
+        code: 'INTEREST_LIMIT_REACHED'
+      });
+    }
+
+    // Create interest interaction
+    const interest = new Interaction({
+      fromUser: fromUserId,
+      toUser: profileId,
+      type: 'interest',
+      status: 'sent'
+    });
+
+    await interest.save();
+
+    // Update user's daily interest count
+    user.dailyInterests = (user.dailyInterests || 0) + 1;
+    await user.save();
+
     res.status(200).json({
       success: true,
-      message: "Match analytics retrieved successfully",
+      message: "Interest shown successfully",
       data: {
-        matchStats,
-        dailyTrends
+        profileId,
+        remainingInterests: hasUnlimitedInterests ? 'unlimited' : Math.max(0, 5 - todayInterests - 1)
       }
     });
+
   } catch (error) {
-    console.error("Get match analytics error:", error);
+    console.error("Show interest error:", error);
     res.status(500).json({
       success: false,
-      message: "Server error while fetching match analytics",
+      message: "Server error while showing interest",
+      error: error.message
+    });
+  }
+};
+
+// Show super interest in a profile
+export const showSuperInterest = async (req, res) => {
+  try {
+    const { profileId } = req.body;
+    const fromUserId = req.user.id;
+
+    if (!profileId) {
+      return res.status(400).json({
+        success: false,
+        message: "Profile ID is required"
+      });
+    }
+
+    if (profileId === fromUserId) {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot show super interest in your own profile"
+      });
+    }
+
+    // Check if profile exists
+    const targetProfile = await User.findById(profileId);
+    if (!targetProfile) {
+      return res.status(404).json({
+        success: false,
+        message: "Profile not found"
+      });
+    }
+
+    // Check if super interest already exists
+    const existingSuperInterest = await Interaction.findOne({
+      fromUser: fromUserId,
+      toUser: profileId,
+      type: 'super_interest'
+    });
+
+    if (existingSuperInterest) {
+      return res.status(400).json({
+        success: false,
+        message: "Super interest already shown"
+      });
+    }
+
+    // Check user's super interest limits
+    const user = await User.findById(fromUserId);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const todaySuperInterests = await Interaction.countDocuments({
+      fromUser: fromUserId,
+      type: 'super_interest',
+      createdAt: { $gte: today }
+    });
+
+    // Check if user has premium membership for unlimited super interests
+    const hasUnlimitedSuperInterests = user.membership && 
+      user.membership.plan && 
+      user.membership.isActive;
+
+    if (!hasUnlimitedSuperInterests && todaySuperInterests >= 1) {
+      return res.status(400).json({
+        success: false,
+        message: "Daily super interest limit reached. Upgrade to premium for unlimited super interests.",
+        code: 'SUPER_INTEREST_LIMIT_REACHED'
+      });
+    }
+
+    // Create super interest interaction
+    const superInterest = new Interaction({
+      fromUser: fromUserId,
+      toUser: profileId,
+      type: 'super_interest',
+      status: 'sent'
+    });
+
+    await superInterest.save();
+
+    // Update user's daily super interest count
+    user.dailySuperInterests = (user.dailySuperInterests || 0) + 1;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Super interest shown successfully",
+      data: {
+        profileId,
+        remainingSuperInterests: hasUnlimitedSuperInterests ? 'unlimited' : Math.max(0, 1 - todaySuperInterests - 1)
+      }
+    });
+
+  } catch (error) {
+    console.error("Show super interest error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while showing super interest",
+      error: error.message
+    });
+  }
+};
+
+// Get user's interest limits
+export const getInterestLimits = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const user = await User.findById(userId).select('membership dailyInterests dailySuperInterests');
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Get today's usage
+    const todayInterests = await Interaction.countDocuments({
+      fromUser: userId,
+      type: 'interest',
+      createdAt: { $gte: today }
+    });
+
+    const todaySuperInterests = await Interaction.countDocuments({
+      fromUser: userId,
+      type: 'super_interest',
+      createdAt: { $gte: today }
+    });
+
+    // Check if user has premium membership
+    const hasUnlimitedInterests = user.membership && 
+      user.membership.plan && 
+      user.membership.isActive;
+
+    const hasUnlimitedSuperInterests = user.membership && 
+      user.membership.plan && 
+      user.membership.isActive;
+
+    res.status(200).json({
+      success: true,
+      message: "Interest limits retrieved successfully",
+      data: {
+        freeInterests: hasUnlimitedInterests ? 'unlimited' : Math.max(0, 5 - todayInterests),
+        freeSuperInterests: hasUnlimitedSuperInterests ? 'unlimited' : Math.max(0, 1 - todaySuperInterests),
+        usedInterests: todayInterests,
+        usedSuperInterests: todaySuperInterests,
+        hasUnlimitedInterests,
+        hasUnlimitedSuperInterests
+      }
+    });
+
+  } catch (error) {
+    console.error("Get interest limits error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while fetching interest limits",
+      error: error.message
+    });
+  }
+};
+
+// Get mutual matches (profiles who also showed interest)
+export const getMutualMatches = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { page = 1, limit = 20 } = req.query;
+
+    // Get profiles that the user has shown interest in
+    const userInterests = await Interaction.find({
+      fromUser: userId,
+      type: 'interest'
+    }).select('toUser');
+
+    const interestedProfileIds = userInterests.map(interest => interest.toUser);
+
+    // Get profiles that have shown interest in the user
+    const mutualInterests = await Interaction.find({
+      toUser: userId,
+      fromUser: { $in: interestedProfileIds },
+      type: 'interest'
+    }).populate('fromUser', '-password -otp -otpExpiry');
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const paginatedMatches = mutualInterests.slice(skip, skip + parseInt(limit));
+
+    res.status(200).json({
+      success: true,
+      message: "Mutual matches retrieved successfully",
+      data: paginatedMatches.map(match => ({
+        ...match.fromUser.toObject(),
+        matchedAt: match.createdAt
+      })),
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(mutualInterests.length / parseInt(limit)),
+        totalMatches: mutualInterests.length,
+        hasNext: skip + paginatedMatches.length < mutualInterests.length,
+        hasPrev: parseInt(page) > 1
+      }
+    });
+
+  } catch (error) {
+    console.error("Get mutual matches error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while fetching mutual matches",
       error: error.message
     });
   }

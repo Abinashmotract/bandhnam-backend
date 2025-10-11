@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { generateUserIdMiddleware } from "../middlewares/generateCustomId.js";
 
 const userSchema = new mongoose.Schema(
   {
@@ -7,6 +8,7 @@ const userSchema = new mongoose.Schema(
     email: { type: String, required: true, unique: true },
     phoneNumber: { type: String, required: true, unique: true },
     password: { type: String, required: true },
+    customId: { type: String, unique: true, sparse: true }, // Jeevansathi-style ID like TYXX0117
     profileFor: {
       type: String,
       required: true,
@@ -128,6 +130,38 @@ const userSchema = new mongoose.Schema(
     isPhoneVerified: { type: Boolean, default: false },
     isIdVerified: { type: Boolean, default: false },
     isPhotoVerified: { type: Boolean, default: false },
+    
+    // Email verification
+    emailVerificationToken: String,
+    emailVerificationExpires: Date,
+    
+    // Phone verification
+    phoneVerificationOTP: String,
+    phoneVerificationExpires: Date,
+    
+    // ID verification
+    idVerification: {
+      documentType: String,
+      documentNumber: String,
+      frontImage: String,
+      backImage: String,
+      status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
+      submittedAt: Date,
+      reviewedAt: Date,
+      reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      rejectionReason: String
+    },
+    
+    // Photo verification
+    photoVerification: {
+      photos: [String],
+      status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
+      submittedAt: Date,
+      reviewedAt: Date,
+      reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      rejectionReason: String
+    },
+    
     profileCompletion: { type: Number, default: 0 },
     
     // Account status
@@ -251,5 +285,8 @@ userSchema.pre("save", function (next) {
   this.profileCompletion = this.calculateProfileCompletion();
   next();
 });
+
+// Add middleware to generate custom ID before saving
+userSchema.pre('save', generateUserIdMiddleware);
 
 export default mongoose.model("User", userSchema);
