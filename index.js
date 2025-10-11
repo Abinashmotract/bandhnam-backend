@@ -33,6 +33,8 @@ import successStoriesRoutes from "./routes/successStoriesRoutes.js";
 import systemSettingsRoutes from "./routes/systemSettingsRoutes.js";
 import seedRoutes from "./routes/seedRoutes.js";
 import notificationsRoutes from "./routes/notificationsRoutes.js";
+import activityRoutes from "./routes/activityRoutes.js";
+import conversationRoutes from "./routes/conversationRoutes.js";
 
 // Import middleware
 import { generalLimiter, authLimiter, otpLimiter, searchLimiter, messageLimiter, adminLimiter } from "./middlewares/rateLimiter.js";
@@ -151,15 +153,19 @@ app.use("/api/blog", blogRoutes);
 app.use("/api/analytics", adminAnalyticsRoutes);
 
 // Admin panel routes
-app.use("/api/admin/matches", adminLimiter, matchesRoutes);
-app.use("/api/admin/messages", adminLimiter, messagesRoutes);
-app.use("/api/admin/verification", adminLimiter, adminVerificationRoutes);
-app.use("/api/admin/analytics", adminLimiter, adminAnalyticsRoutes);
-app.use("/api/admin/success-stories", adminLimiter, successStoriesRoutes);
-app.use("/api/admin/settings", adminLimiter, systemSettingsRoutes);
+app.use("/api/admin/matches", matchesRoutes);
+app.use("/api/admin/messages", messagesRoutes);
+app.use("/api/admin/verification", adminVerificationRoutes);
+app.use("/api/admin/analytics", adminAnalyticsRoutes);
+app.use("/api/admin/success-stories", successStoriesRoutes);
+app.use("/api/admin/settings", systemSettingsRoutes);
 
 // Seed data routes
 app.use("/api/seed", seedRoutes);
+
+// Activity and conversation routes
+app.use("/api/activity", activityRoutes);
+app.use("/api/conversations", conversationRoutes);
 
 server.listen(process.env.PORT, () => {
   console.log(`Server running on port ${process.env.PORT}`);

@@ -1,25 +1,23 @@
-import express from "express";
-import {
-  searchProfiles,
-  getRecommendations,
-  saveSearchFilter,
-  getSavedFilters,
-  deleteSavedFilter
-} from "../controllers/searchController.js";
-import { getAdvancedMatches } from "../controllers/advancedMatchingController.js";
-import { VerifyToken } from "../middlewares/authMiddleware.js";
+import express from 'express';
+import { 
+  getSearchCriteria, 
+  searchByCriteria, 
+  searchByProfileId 
+} from '../controllers/searchController.js';
+import { VerifyToken } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
 
-// All routes require authentication
-router.use(VerifyToken);
+// Test route without authentication
+router.get('/criteria/test', getSearchCriteria);
 
-// Search and filtering routes
-router.get("/", searchProfiles);
-router.get("/recommendations", getRecommendations);
-router.get("/advanced-matches", getAdvancedMatches);
-router.post("/save", saveSearchFilter);
-router.get("/saved", getSavedFilters);
-router.delete("/saved/:filterId", deleteSavedFilter);
+// Get search criteria options
+router.get('/criteria', VerifyToken, getSearchCriteria);
+
+// Search profiles by criteria
+router.post('/by-criteria', VerifyToken, searchByCriteria);
+
+// Search by profile ID
+router.get('/by-profile-id/:profileId', VerifyToken, searchByProfileId);
 
 export default router;

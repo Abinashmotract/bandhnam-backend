@@ -1,447 +1,274 @@
-import User from "../models/User.js";
-import SearchFilter from "../models/SearchFilter.js";
-import Interaction from "../models/Interaction.js";
+import User from '../models/User.js';
 
-// Advanced search with geolocation support
-export const searchProfiles = async (req, res) => {
+// Get search criteria options
+export const getSearchCriteria = async (req, res) => {
   try {
-    const currentUserId = req.user._id;
-    const {
-      ageMin, ageMax, gender, religion, caste, education, occupation, location,
-      maritalStatus, incomeMin, incomeMax, diet, drinkingHabits, smokingHabits,
-      fitnessLevel, bodyType, complexion, languages, familyType, familyIncome,
-      industry, fieldOfStudy, heightMin, heightMax,
-      // Geolocation parameters
-      latitude, longitude, radius = 50, // radius in kilometers
-      // Pagination
-      page = 1, limit = 20, sortBy = "createdAt", sortOrder = "desc"
-    } = req.query;
+    const criteria = {
+      maritalStatus: [
+        'Doesn\'t Matter',
+        'Never Married',
+        'Awaiting Divorce',
+        'Divorced',
+        'Widowed',
+        'Annulled',
+        'Married'
+      ],
+      religion: [
+        'Doesn\'t Matter',
+        'Hindu',
+        'Muslim',
+        'Sikh',
+        'Christian',
+        'Buddhist',
+        'Jain',
+        'Parsi',
+        'Jewish',
+        'Bahai'
+      ],
+      manglik: [
+        'Doesn\'t Matter',
+        'Manglik',
+        'Non Manglik',
+        'Angshik (Partial Manglik)'
+      ],
+      diet: [
+        'Doesn\'t Matter',
+        'Vegetarian',
+        'Non Vegetarian',
+        'Jain',
+        'Eggetarian'
+      ],
+      showProfiles: [
+        'All Profiles',
+        'Profile with photos'
+      ],
+      education: [
+        'B.A', 'B.Com', 'B.Sc', 'B.Tech', 'B.E', 'B.Pharm', 'BBA', 'BCA',
+        'M.A', 'M.Com', 'M.Sc', 'M.Tech', 'M.E', 'M.Pharm', 'MBA', 'MCA',
+        'Ph.D', 'MD', 'MS', 'CA', 'CS', 'ICWA', 'LLB', 'LLM'
+      ],
+      occupation: [
+        'Software Engineer', 'Doctor', 'Teacher', 'Engineer', 'Business',
+        'Government Employee', 'Private Employee', 'Self Employed',
+        'Student', 'Homemaker', 'Retired', 'Other'
+      ],
+      motherTongue: [
+        'Hindi', 'English', 'Bengali', 'Telugu', 'Marathi', 'Tamil',
+        'Gujarati', 'Urdu', 'Kannada', 'Odia', 'Malayalam', 'Punjabi',
+        'Assamese', 'Nepali', 'Sanskrit', 'Other'
+      ],
+      countries: [
+        'India', 'United States', 'United Kingdom', 'Canada', 'Australia',
+        'United Arab Emirates', 'Singapore', 'Germany', 'France', 'Other'
+      ]
+    };
 
-    // Build search filters
-    let filters = { _id: { $ne: currentUserId } };
+    res.status(200).json({
+      success: true,
+      data: criteria
+    });
+  } catch (error) {
+    console.error('Error fetching search criteria:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch search criteria',
+      error: error.message
+    });
+  }
+};
+
+// Search profiles by criteria
+export const searchByCriteria = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const {
+      ageMin,
+      ageMax,
+      heightMin,
+      heightMax,
+      maritalStatus,
+      religion,
+      caste,
+      motherTongue,
+      annualIncomeMin,
+      annualIncomeMax,
+      country,
+      city,
+      showProfiles,
+      manglik,
+      diet,
+      education,
+      occupation
+    } = req.body;
+
+    // Build query
+    let query = {
+      _id: { $ne: userId }, // Exclude current user
+      isActive: true
+    };
 
     // Age filter
     if (ageMin || ageMax) {
-      const currentYear = new Date().getFullYear();
-      filters.dob = {};
-      if (ageMin) {
-        filters.dob.$lte = new Date(`${currentYear - ageMin}-12-31`);
-      }
-      if (ageMax) {
-        filters.dob.$gte = new Date(`${currentYear - ageMax}-01-01`);
-      }
-    }
-
-    // Basic filters
-    if (gender) filters.gender = { $in: Array.isArray(gender) ? gender : [gender] };
-    if (religion) filters.religion = { $in: Array.isArray(religion) ? religion : [religion] };
-    if (caste) filters.caste = { $in: Array.isArray(caste) ? caste : [caste] };
-    if (education) filters.education = { $in: Array.isArray(education) ? education : [education] };
-    if (occupation) filters.occupation = { $in: Array.isArray(occupation) ? occupation : [occupation] };
-    if (maritalStatus) filters.maritalStatus = { $in: Array.isArray(maritalStatus) ? maritalStatus : [maritalStatus] };
-    if (diet) filters.diet = { $in: Array.isArray(diet) ? diet : [diet] };
-    if (drinkingHabits) filters.drinkingHabits = { $in: Array.isArray(drinkingHabits) ? drinkingHabits : [drinkingHabits] };
-    if (smokingHabits) filters.smokingHabits = { $in: Array.isArray(smokingHabits) ? smokingHabits : [smokingHabits] };
-    if (fitnessLevel) filters.fitnessLevel = { $in: Array.isArray(fitnessLevel) ? fitnessLevel : [fitnessLevel] };
-    if (bodyType) filters.bodyType = { $in: Array.isArray(bodyType) ? bodyType : [bodyType] };
-    if (complexion) filters.complexion = { $in: Array.isArray(complexion) ? complexion : [complexion] };
-    if (familyType) filters.familyType = { $in: Array.isArray(familyType) ? familyType : [familyType] };
-    if (familyIncome) filters.familyIncome = { $in: Array.isArray(familyIncome) ? familyIncome : [familyIncome] };
-    if (industry) filters.industry = { $in: Array.isArray(industry) ? industry : [industry] };
-    if (fieldOfStudy) filters.fieldOfStudy = { $in: Array.isArray(fieldOfStudy) ? fieldOfStudy : [fieldOfStudy] };
-
-    // Location filter (text-based)
-    if (location) {
-      filters.$or = [
-        { location: { $regex: location, $options: "i" } },
-        { city: { $regex: location, $options: "i" } },
-        { state: { $regex: location, $options: "i" } }
-      ];
-    }
-
-    // Income filter
-    if (incomeMin || incomeMax) {
-      const incomeRanges = {
-        "0-2": { min: 0, max: 200000 },
-        "2-5": { min: 200000, max: 500000 },
-        "5-10": { min: 500000, max: 1000000 },
-        "10-20": { min: 1000000, max: 2000000 },
-        "20+": { min: 2000000, max: Infinity }
-      };
+      const today = new Date();
+      const maxBirthDate = ageMax ? new Date(today.getFullYear() - ageMax, today.getMonth(), today.getDate()) : null;
+      const minBirthDate = ageMin ? new Date(today.getFullYear() - ageMin, today.getMonth(), today.getDate()) : null;
       
-      const validRanges = [];
-      Object.entries(incomeRanges).forEach(([range, values]) => {
-        if ((!incomeMin || values.max >= incomeMin) && (!incomeMax || values.min <= incomeMax)) {
-          validRanges.push(range);
-        }
-      });
-      
-      if (validRanges.length > 0) {
-        filters.annualIncome = { $in: validRanges };
+      if (maxBirthDate && minBirthDate) {
+        query.dob = { $gte: maxBirthDate, $lte: minBirthDate };
+      } else if (maxBirthDate) {
+        query.dob = { $gte: maxBirthDate };
+      } else if (minBirthDate) {
+        query.dob = { $lte: minBirthDate };
       }
     }
 
     // Height filter
     if (heightMin || heightMax) {
-      const heightRanges = {
-        "4'0\"-4'6\"": { min: 48, max: 54 },
-        "4'6\"-5'0\"": { min: 54, max: 60 },
-        "5'0\"-5'6\"": { min: 60, max: 66 },
-        "5'6\"-6'0\"": { min: 66, max: 72 },
-        "6'0\"-6'6\"": { min: 72, max: 78 },
-        "6'6\"+": { min: 78, max: Infinity }
-      };
-      
-      const validHeightRanges = [];
-      Object.entries(heightRanges).forEach(([range, values]) => {
-        if ((!heightMin || values.max >= heightMin) && (!heightMax || values.min <= heightMax)) {
-          validHeightRanges.push(range);
-        }
-      });
-      
-      if (validHeightRanges.length > 0) {
-        filters.height = { $in: validHeightRanges };
-      }
+      query.height = {};
+      if (heightMin) query.height.$gte = heightMin;
+      if (heightMax) query.height.$lte = heightMax;
     }
 
-    // Languages filter
-    if (languages) {
-      const langArray = Array.isArray(languages) ? languages : [languages];
-      filters.languagesKnown = { $in: langArray };
+    // Other filters
+    if (maritalStatus && maritalStatus !== 'Doesn\'t Matter') {
+      query.maritalStatus = maritalStatus.toLowerCase().replace(' ', '_');
     }
 
-    // Geolocation filter (if coordinates provided)
-    if (latitude && longitude) {
-      // This is a simplified geolocation filter
-      // In production, you'd use MongoDB's geospatial queries
-      filters["location.coordinates"] = {
-        $near: {
-          $geometry: {
-            type: "Point",
-            coordinates: [parseFloat(longitude), parseFloat(latitude)]
-          },
-          $maxDistance: radius * 1000 // Convert km to meters
-        }
-      };
+    if (religion && religion !== 'Doesn\'t Matter') {
+      query.religion = religion;
     }
 
-    // Exclude blocked users
-    const blockedUsers = await Interaction.find({
-      $or: [
-        { fromUser: currentUserId, type: "block" },
-        { toUser: currentUserId, type: "block" }
-      ]
-    }).select("fromUser toUser");
-
-    const blockedUserIds = blockedUsers.map(interaction => 
-      interaction.fromUser.toString() === currentUserId.toString() 
-        ? interaction.toUser 
-        : interaction.fromUser
-    );
-
-    if (blockedUserIds.length > 0) {
-      filters._id = { $nin: blockedUserIds };
+    if (caste) {
+      query.caste = { $regex: caste, $options: 'i' };
     }
 
-    // Calculate pagination
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    const sortOptions = {};
-    sortOptions[sortBy] = sortOrder === "desc" ? -1 : 1;
+    if (motherTongue && motherTongue !== 'Doesn\'t Matter') {
+      query.motherTongue = motherTongue;
+    }
+
+    if (annualIncomeMin || annualIncomeMax) {
+      query.annualIncome = {};
+      if (annualIncomeMin) query.annualIncome.$gte = annualIncomeMin;
+      if (annualIncomeMax) query.annualIncome.$lte = annualIncomeMax;
+    }
+
+    if (country && country !== 'Doesn\'t Matter') {
+      query.country = country;
+    }
+
+    if (city && city !== 'Doesn\'t Matter') {
+      query.city = { $regex: city, $options: 'i' };
+    }
+
+    if (manglik && manglik !== 'Doesn\'t Matter') {
+      query.manglik = manglik;
+    }
+
+    if (diet && diet !== 'Doesn\'t Matter') {
+      query.diet = diet;
+    }
+
+    if (education && education !== 'Doesn\'t Matter') {
+      query.education = { $regex: education, $options: 'i' };
+    }
+
+    if (occupation && occupation !== 'Doesn\'t Matter') {
+      query.occupation = { $regex: occupation, $options: 'i' };
+    }
+
+    // Show profiles with photos only
+    if (showProfiles === 'Profile with photos') {
+      query.profileImage = { $exists: true, $ne: null };
+    }
 
     // Execute search
-    const users = await User.find(filters, "-password -otp -otpExpiry -isOtpVerified")
-      .sort(sortOptions)
-      .skip(skip)
-      .limit(parseInt(limit));
-
-    const totalCount = await User.countDocuments(filters);
-
-    // Format response
-    const baseUrl = `${req.protocol}://${req.get("host")}`;
-    const profiles = users.map(user => ({
-      _id: user._id,
-      name: user.name,
-      gender: user.gender,
-      dob: user.dob,
-      age: user.dob ? new Date().getFullYear() - new Date(user.dob).getFullYear() : null,
-      occupation: user.occupation,
-      location: user.location,
-      city: user.city,
-      state: user.state,
-      profileFor: user.profileFor,
-      education: user.education,
-      religion: user.religion,
-      caste: user.caste,
-      about: user.about,
-      height: user.height,
-      maritalStatus: user.maritalStatus,
-      annualIncome: user.annualIncome,
-      profileImage: user.profileImage ? `${baseUrl}/${user.profileImage}` : null,
-      photos: user.photos?.map(photo => `${baseUrl}/${photo}`) || [],
-      profileCompletion: user.profileCompletion,
-      createdAt: user.createdAt
-    }));
+    const profiles = await User.find(query)
+      .select('name profileImage customId age height maritalStatus religion caste motherTongue annualIncome country city manglik diet education occupation about')
+      .sort({ createdAt: -1 })
+      .limit(50);
 
     res.status(200).json({
       success: true,
-      message: "Search completed successfully",
-      data: {
-        profiles,
-        pagination: {
-          currentPage: parseInt(page),
-          totalPages: Math.ceil(totalCount / parseInt(limit)),
-          totalCount,
-          hasNext: skip + parseInt(limit) < totalCount,
-          hasPrev: parseInt(page) > 1
-        }
-      }
+      data: profiles.map(profile => ({
+        id: profile._id,
+        name: profile.name,
+        customId: profile.customId,
+        profileImage: profile.profileImage,
+        age: profile.age,
+        height: profile.height,
+        maritalStatus: profile.maritalStatus,
+        religion: profile.religion,
+        caste: profile.caste,
+        motherTongue: profile.motherTongue,
+        annualIncome: profile.annualIncome,
+        country: profile.country,
+        city: profile.city,
+        manglik: profile.manglik,
+        diet: profile.diet,
+        education: profile.education,
+        occupation: profile.occupation,
+        about: profile.about
+      }))
     });
-
   } catch (error) {
-    console.error("Search profiles error:", error);
+    console.error('Error searching profiles:', error);
     res.status(500).json({
       success: false,
-      message: "Server error during search",
+      message: 'Failed to search profiles',
       error: error.message
     });
   }
 };
 
-// Get recommended matches based on user preferences
-export const getRecommendations = async (req, res) => {
+// Search by profile ID
+export const searchByProfileId = async (req, res) => {
   try {
-    const currentUserId = req.user._id;
-    const { limit = 20 } = req.query;
+    const userId = req.user.id;
+    const { profileId } = req.params;
 
-    const currentUser = await User.findById(currentUserId);
-    if (!currentUser || !currentUser.preferences) {
-      return res.status(400).json({
-        success: false,
-        message: "Please set your partner preferences first"
-      });
-    }
-
-    // Build recommendation filters based on user preferences
-    let filters = { _id: { $ne: currentUserId } };
-
-    // Age filter
-    if (currentUser.preferences.ageRange) {
-      const currentYear = new Date().getFullYear();
-      filters.dob = {};
-      if (currentUser.preferences.ageRange.min) {
-        filters.dob.$lte = new Date(`${currentYear - currentUser.preferences.ageRange.min}-12-31`);
-      }
-      if (currentUser.preferences.ageRange.max) {
-        filters.dob.$gte = new Date(`${currentYear - currentUser.preferences.ageRange.max}-01-01`);
-      }
-    }
-
-    // Other preference filters
-    if (currentUser.preferences.religion) {
-      filters.religion = currentUser.preferences.religion;
-    }
-    if (currentUser.preferences.caste) {
-      filters.caste = currentUser.preferences.caste;
-    }
-    if (currentUser.preferences.education) {
-      filters.education = currentUser.preferences.education;
-    }
-    if (currentUser.preferences.location) {
-      filters.location = currentUser.preferences.location;
-    }
-    if (currentUser.preferences.maritalStatusPref) {
-      filters.maritalStatus = currentUser.preferences.maritalStatusPref;
-    }
-
-    // Exclude blocked users
-    const blockedUsers = await Interaction.find({
+    const profile = await User.findOne({
       $or: [
-        { fromUser: currentUserId, type: "block" },
-        { toUser: currentUserId, type: "block" }
-      ]
-    }).select("fromUser toUser");
+        { customId: profileId },
+        { _id: profileId }
+      ],
+      _id: { $ne: userId }
+    }).select('name profileImage customId age height maritalStatus religion caste motherTongue annualIncome country city manglik diet education occupation about');
 
-    const blockedUserIds = blockedUsers.map(interaction => 
-      interaction.fromUser.toString() === currentUserId.toString() 
-        ? interaction.toUser 
-        : interaction.fromUser
-    );
-
-    if (blockedUserIds.length > 0) {
-      filters._id = { $nin: blockedUserIds };
-    }
-
-    // Get users and calculate match scores
-    const users = await User.find(filters, "-password -otp -otpExpiry -isOtpVerified")
-      .limit(parseInt(limit));
-
-    const baseUrl = `${req.protocol}://${req.get("host")}`;
-
-    const recommendations = users.map(user => {
-      let score = 0;
-      let total = 0;
-
-      // Calculate match score
-      if (currentUser.preferences.ageRange && user.dob) {
-        total++;
-        const age = new Date().getFullYear() - new Date(user.dob).getFullYear();
-        if (age >= currentUser.preferences.ageRange.min && 
-            age <= currentUser.preferences.ageRange.max) {
-          score++;
-        }
-      }
-
-      if (currentUser.preferences.religion && user.religion === currentUser.preferences.religion) {
-        total++;
-        score++;
-      }
-
-      if (currentUser.preferences.caste && user.caste === currentUser.preferences.caste) {
-        total++;
-        score++;
-      }
-
-      if (currentUser.preferences.education && user.education === currentUser.preferences.education) {
-        total++;
-        score++;
-      }
-
-      if (currentUser.preferences.location && user.location === currentUser.preferences.location) {
-        total++;
-        score++;
-      }
-
-      const matchScore = total > 0 ? Math.round((score / total) * 100) : 0;
-
-      return {
-        _id: user._id,
-        name: user.name,
-        gender: user.gender,
-        dob: user.dob,
-        age: user.dob ? new Date().getFullYear() - new Date(user.dob).getFullYear() : null,
-        occupation: user.occupation,
-        location: user.location,
-        profileFor: user.profileFor,
-        education: user.education,
-        religion: user.religion,
-        caste: user.caste,
-        about: user.about,
-        matchScore,
-        profileImage: user.profileImage ? `${baseUrl}/${user.profileImage}` : null,
-        photos: user.photos?.map(photo => `${baseUrl}/${photo}`) || [],
-        profileCompletion: user.profileCompletion
-      };
-    });
-
-    // Sort by match score
-    recommendations.sort((a, b) => b.matchScore - a.matchScore);
-
-    res.status(200).json({
-      success: true,
-      message: "Recommendations fetched successfully",
-      data: recommendations
-    });
-
-  } catch (error) {
-    console.error("Get recommendations error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Server error while fetching recommendations",
-      error: error.message
-    });
-  }
-};
-
-// Save search filter
-export const saveSearchFilter = async (req, res) => {
-  try {
-    const currentUserId = req.user._id;
-    const { name, filters } = req.body;
-
-    if (!name || !filters) {
-      return res.status(400).json({
-        success: false,
-        message: "Filter name and filters are required"
-      });
-    }
-
-    const searchFilter = await SearchFilter.create({
-      user: currentUserId,
-      name,
-      filters
-    });
-
-    res.status(201).json({
-      success: true,
-      message: "Search filter saved successfully",
-      data: searchFilter
-    });
-
-  } catch (error) {
-    console.error("Save search filter error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Server error while saving filter",
-      error: error.message
-    });
-  }
-};
-
-// Get saved search filters
-export const getSavedFilters = async (req, res) => {
-  try {
-    const currentUserId = req.user._id;
-
-    const filters = await SearchFilter.find({ 
-      user: currentUserId, 
-      isActive: true 
-    }).sort({ lastUsed: -1 });
-
-    res.status(200).json({
-      success: true,
-      message: "Saved filters fetched successfully",
-      data: filters
-    });
-
-  } catch (error) {
-    console.error("Get saved filters error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Server error while fetching filters",
-      error: error.message
-    });
-  }
-};
-
-// Delete saved search filter
-export const deleteSavedFilter = async (req, res) => {
-  try {
-    const currentUserId = req.user._id;
-    const { filterId } = req.params;
-
-    const filter = await SearchFilter.findOneAndUpdate(
-      { _id: filterId, user: currentUserId },
-      { isActive: false },
-      { new: true }
-    );
-
-    if (!filter) {
+    if (!profile) {
       return res.status(404).json({
         success: false,
-        message: "Filter not found"
+        message: 'Profile not found'
       });
     }
 
     res.status(200).json({
       success: true,
-      message: "Filter deleted successfully"
+      data: {
+        id: profile._id,
+        name: profile.name,
+        customId: profile.customId,
+        profileImage: profile.profileImage,
+        age: profile.age,
+        height: profile.height,
+        maritalStatus: profile.maritalStatus,
+        religion: profile.religion,
+        caste: profile.caste,
+        motherTongue: profile.motherTongue,
+        annualIncome: profile.annualIncome,
+        country: profile.country,
+        city: profile.city,
+        manglik: profile.manglik,
+        diet: profile.diet,
+        education: profile.education,
+        occupation: profile.occupation,
+        about: profile.about
+      }
     });
-
   } catch (error) {
-    console.error("Delete saved filter error:", error);
+    console.error('Error searching by profile ID:', error);
     res.status(500).json({
       success: false,
-      message: "Server error while deleting filter",
+      message: 'Failed to search by profile ID',
       error: error.message
     });
   }

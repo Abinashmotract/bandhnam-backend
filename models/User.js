@@ -131,6 +131,10 @@ const userSchema = new mongoose.Schema(
     isIdVerified: { type: Boolean, default: false },
     isPhotoVerified: { type: Boolean, default: false },
     
+    // Online status
+    isOnline: { type: Boolean, default: false },
+    lastSeen: { type: Date, default: Date.now },
+    
     // Email verification
     emailVerificationToken: String,
     emailVerificationExpires: Date,

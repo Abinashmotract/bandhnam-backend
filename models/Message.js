@@ -1,14 +1,14 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
 
 const messageSchema = new mongoose.Schema({
   sender: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
+    ref: 'User',
     required: true
   },
   receiver: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
+    ref: 'User',
     required: true
   },
   content: {
@@ -18,39 +18,32 @@ const messageSchema = new mongoose.Schema({
   },
   messageType: {
     type: String,
-    enum: ["text", "image", "file"],
-    default: "text"
+    enum: ['text', 'image', 'voice', 'video'],
+    default: 'text'
   },
-  mediaUrl: String,
   isRead: {
     type: Boolean,
     default: false
   },
-  readAt: Date,
+  readAt: {
+    type: Date
+  },
   isDeleted: {
     type: Boolean,
     default: false
   },
-  deletedAt: Date,
-  // For message reactions
-  reactions: [{
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User"
-    },
-    emoji: String,
-    createdAt: {
-      type: Date,
-      default: Date.now
-    }
-  }]
+  deletedAt: {
+    type: Date
+  }
 }, {
   timestamps: true
 });
 
-// Indexes for efficient queries
-messageSchema.index({ sender: 1, receiver: 1, createdAt: -1 });
-messageSchema.index({ receiver: 1, isRead: 1 });
+// Indexes for better query performance
+messageSchema.index({ sender: 1, receiver: 1 });
 messageSchema.index({ createdAt: -1 });
+messageSchema.index({ isRead: 1 });
 
-export default mongoose.model("Message", messageSchema);
+const Message = mongoose.model('Message', messageSchema);
+
+export default Message;
