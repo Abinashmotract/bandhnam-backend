@@ -1,18 +1,27 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
 
 const notificationSchema = new mongoose.Schema({
-  user: {
+  userId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
+    ref: 'User',
     required: true
   },
   type: {
     type: String,
+    required: true,
     enum: [
-      "like", "superlike", "favourite", "match", "message", "visit",
-      "profile_view", "verification", "subscription", "system", "admin"
-    ],
-    required: true
+      'match_of_day',
+      'profile_view',
+      'interest_received',
+      'interest_sent',
+      'profile_live',
+      'premium_reminder',
+      'message_received',
+      'profile_updated',
+      'verification_approved',
+      'verification_rejected',
+      'system_announcement'
+    ]
   },
   title: {
     type: String,
@@ -22,7 +31,12 @@ const notificationSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  data: {
+  relatedUserId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  metadata: {
     type: mongoose.Schema.Types.Mixed,
     default: {}
   },
@@ -30,40 +44,21 @@ const notificationSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-  readAt: Date,
-  // For push notifications
-  pushSent: {
-    type: Boolean,
-    default: false
-  },
-  pushSentAt: Date,
-  // For email notifications
-  emailSent: {
-    type: Boolean,
-    default: false
-  },
-  emailSentAt: Date,
-  // For SMS notifications
-  smsSent: {
-    type: Boolean,
-    default: false
-  },
-  smsSentAt: Date,
-  // Notification priority
-  priority: {
+  actionUrl: {
     type: String,
-    enum: ["low", "medium", "high", "urgent"],
-    default: "medium"
+    default: null
   },
-  // Expiry for notifications
-  expiresAt: Date
+  actionText: {
+    type: String,
+    default: null
+  }
 }, {
   timestamps: true
 });
 
-// Indexes
-notificationSchema.index({ user: 1, isRead: 1, createdAt: -1 });
-notificationSchema.index({ type: 1, createdAt: -1 });
-notificationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+// Index for efficient queries
+notificationSchema.index({ userId: 1, createdAt: -1 });
+notificationSchema.index({ userId: 1, isRead: 1 });
+notificationSchema.index({ type: 1 });
 
-export default mongoose.model("Notification", notificationSchema);
+export default mongoose.model('Notification', notificationSchema);

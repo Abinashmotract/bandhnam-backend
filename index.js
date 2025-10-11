@@ -32,6 +32,7 @@ import adminAnalyticsRoutes from "./routes/analyticsRoutes.js";
 import successStoriesRoutes from "./routes/successStoriesRoutes.js";
 import systemSettingsRoutes from "./routes/systemSettingsRoutes.js";
 import seedRoutes from "./routes/seedRoutes.js";
+import notificationsRoutes from "./routes/notificationsRoutes.js";
 
 // Import middleware
 import { generalLimiter, authLimiter, otpLimiter, searchLimiter, messageLimiter, adminLimiter } from "./middlewares/rateLimiter.js";
@@ -136,7 +137,7 @@ app.use("/api/verify", userVerificationRoutes);
 app.use("/api/matches", matchesRoutes);
 
 // Notification routes
-app.use("/api/notifications", notificationRoutes);
+app.use("/api/notifications", notificationsRoutes);
 
 // Contact and membership routes
 app.use("/api/contact", contactRoutes);
