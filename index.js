@@ -74,6 +74,15 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Test matches endpoint without auth for debugging
+app.get('/api/matches/test', (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'Matches endpoint is accessible',
+    data: []
+  });
+});
+
 const server = http.createServer(app);
 
 const io = new Server(server, {

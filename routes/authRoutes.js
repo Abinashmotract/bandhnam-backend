@@ -6,7 +6,9 @@ import {
     forgotPassword,
     verifyOtp,
     resetPassword, getUserDetails, resendOtp, updateUser, logout,
-    updateProfilePicture
+    updateProfilePicture,
+    uploadProfileImage,
+    removeProfileImage
 } from '../controllers/authController.js';
 import { VerifyToken } from '../middlewares/authMiddleware.js';
 import upload from '../middlewares/upload.js';
@@ -27,5 +29,7 @@ router.post('/logout', logout);
 router.get('/user', VerifyToken, getUserDetails);
 router.put('/user/update', VerifyToken, upload.fields([{ name: 'photos', maxCount: 10 }]), updateUser);
 router.put('/user/profile-picture', VerifyToken, upload.single('profileImage'), updateProfilePicture);
+router.post('/user/upload-profile-image', VerifyToken, upload.single('profileImage'), uploadProfileImage);
+router.delete('/user/remove-profile-image', VerifyToken, removeProfileImage);
 
 export default router;

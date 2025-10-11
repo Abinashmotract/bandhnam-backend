@@ -636,3 +636,116 @@ export const resetPassword = async (req, res) => {
         res.status(500).json({ success: false, status: 500, message: "Server error", error: err.message });
     }
 };
+
+// -------------------- PROFILE IMAGE UPLOAD --------------------
+export const uploadProfileImage = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        
+        if (!req.file) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "No image file provided" 
+            });
+        }
+
+        // Validate file type
+        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+        if (!allowedTypes.includes(req.file.mimetype)) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "Invalid file type. Only JPEG, PNG, and WebP images are allowed" 
+            });
+        }
+
+        // Validate file size (5MB max)
+        const maxSize = 5 * 1024 * 1024; // 5MB
+        if (req.file.size > maxSize) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "File size too large. Maximum size is 5MB" 
+            });
+        }
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ 
+                success: false, 
+                message: "User not found" 
+            });
+        }
+
+        // Delete old profile image if exists
+        if (user.profileImage) {
+            const oldImagePath = path.join(__dirname, '..', 'uploads', user.profileImage);
+            if (fs.existsSync(oldImagePath)) {
+                fs.unlinkSync(oldImagePath);
+            }
+        }
+
+        // Update user's profile image (store only filename, not full URL)
+        user.profileImage = req.file.filename;
+        await user.save();
+
+        res.status(200).json({
+            success: true,
+            message: "Profile image uploaded successfully",
+            data: {
+                profileImage: user.profileImage,
+                profileImageUrl: `http://localhost:3000/uploads/${user.profileImage}`
+            }
+        });
+
+    } catch (error) {
+        console.error("Upload profile image error:", error);
+        res.status(500).json({ 
+            success: false, 
+            message: "Server error", 
+            error: error.message 
+        });
+    }
+};
+
+// -------------------- PROFILE IMAGE REMOVE --------------------
+export const removeProfileImage = async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ 
+                success: false, 
+                message: "User not found" 
+            });
+        }
+
+        // Delete profile image file if exists
+        if (user.profileImage) {
+            const imagePath = path.join(__dirname, '..', 'uploads', user.profileImage);
+            if (fs.existsSync(imagePath)) {
+                fs.unlinkSync(imagePath);
+            }
+        }
+
+        // Clear profile image from user record
+        user.profileImage = undefined;
+        await user.save();
+
+        res.status(200).json({
+            success: true,
+            message: "Profile image removed successfully",
+            data: {
+                profileImage: null,
+                profileImageUrl: null
+            }
+        });
+
+    } catch (error) {
+        console.error("Remove profile image error:", error);
+        res.status(500).json({ 
+            success: false, 
+            message: "Server error", 
+            error: error.message 
+        });
+    }
+};
