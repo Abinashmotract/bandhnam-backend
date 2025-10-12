@@ -8,34 +8,9 @@ dotenv.config();
 // Connect to MongoDB
 const connectDB = async () => {
   try {
-    // Try different MongoDB connection strings
-    const connectionStrings = [
-      'mongodb://localhost:27017/bandhnam',
-      'mongodb://127.0.0.1:27017/bandhnam',
-      'mongodb://localhost:27017/bandhnam?retryWrites=true&w=majority'
-    ];
-    
-    let connected = false;
-    for (const uri of connectionStrings) {
-      try {
-        console.log(`Trying to connect to: ${uri}`);
-        await mongoose.connect(uri, {
-          useNewUrlParser: true,
-          useUnifiedTopology: true,
-          serverSelectionTimeoutMS: 5000
-        });
-        console.log('MongoDB connected successfully');
-        connected = true;
-        break;
-      } catch (err) {
-        console.log(`Failed to connect to ${uri}:`, err.message);
-        continue;
-      }
-    }
-    
-    if (!connected) {
-      throw new Error('Could not connect to any MongoDB instance');
-    }
+    console.log('Connecting to MongoDB at:', process.env.MONGO_URI);
+    await mongoose.connect(process.env.MONGO_URI);
+    console.log('MongoDB connected successfully');
   } catch (error) {
     console.error('MongoDB connection error:', error);
     process.exit(1);

@@ -1,6 +1,7 @@
 import User from "../models/User.js";
 import Interaction from "../models/Interaction.js";
 import mongoose from "mongoose";
+import { getCoordinatesFromLocation, calculateDistance } from '../utils/geocoding.js';
 
 // Get matches for a user
 export const getMatches = async (req, res) => {
@@ -21,6 +22,8 @@ export const getMatches = async (req, res) => {
       location = '',
       sortBy = 'recentlyJoined'
     } = req.query;
+
+    console.log('Request parameters:', { nearby, verified, justJoined });
 
     // Get current user's preferences for matching
     const currentUser = await User.findById(userId).select('preferences location gender');
@@ -58,6 +61,13 @@ export const getMatches = async (req, res) => {
     // Additional filters
     if (verified === 'true') {
       matchQuery.isEmailVerified = true;
+    }
+
+    if (justJoined === 'true') {
+      // Filter for users who joined within the last 7 days
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      matchQuery.createdAt = { $gte: sevenDaysAgo };
     }
 
     if (religion) {
@@ -120,8 +130,8 @@ export const getMatches = async (req, res) => {
       .skip(skip)
       .limit(parseInt(limit));
 
-    // Get total count for pagination
-    const totalMatches = await User.countDocuments(matchQuery);
+    // Get total count for pagination (before applying nearby filter)
+    let totalMatches = await User.countDocuments(matchQuery);
 
     // Get user's interactions to show interest status
     const userInteractions = await Interaction.find({
@@ -140,15 +150,36 @@ export const getMatches = async (req, res) => {
       const age = match.dob ? 
         new Date().getFullYear() - new Date(match.dob).getFullYear() : null;
       
-      // Calculate distance (simplified - in real app, use proper geolocation)
-      const distance = match.location && currentUser.location ? 
-        Math.floor(Math.random() * 50) + 1 : null;
+      // Calculate distance using coordinates or city/state
+      let distance = null;
+      let isNearby = false;
+      
+      if (match.coordinates && currentUser.coordinates) {
+        // Use coordinates for precise distance calculation
+        distance = calculateDistance(
+          currentUser.coordinates.lat, 
+          currentUser.coordinates.lng,
+          match.coordinates.lat, 
+          match.coordinates.lng
+        );
+        isNearby = distance <= 10; // Within 10km
+      } else if (match.city && currentUser.city && match.state && currentUser.state) {
+        // Fallback: if same city, consider nearby
+        isNearby = match.city.toLowerCase() === currentUser.city.toLowerCase() && 
+                   match.state.toLowerCase() === currentUser.state.toLowerCase();
+        distance = isNearby ? 5 : null;
+      }
+
+      // Calculate if user joined recently (within last 7 days)
+      const daysSinceJoined = (new Date() - new Date(match.createdAt)) / (1000 * 60 * 60 * 24);
+      const isJustJoined = daysSinceJoined <= 7;
 
       // Calculate match score based on various factors
       let matchScore = 50; // Base score
       
       if (match.isEmailVerified) matchScore += 10;
       if (match.isPhoneVerified) matchScore += 10;
+      if (match.isIdVerified) matchScore += 15;
       if (match.profileCompletion >= 80) matchScore += 15;
       if (match.profileCompletion >= 90) matchScore += 10;
       
@@ -160,8 +191,8 @@ export const getMatches = async (req, res) => {
         ...match.toObject(),
         age,
         distance: distance ? `${distance} km` : null,
-        isNearby: distance && distance <= 10,
-        isJustJoined: new Date() - new Date(match.createdAt) < 7 * 24 * 60 * 60 * 1000, // 7 days
+        isNearby,
+        isJustJoined,
         matchScore,
         hasShownInterest: interactionsMap[match._id.toString()] === 'interest',
         hasShownSuperInterest: interactionsMap[match._id.toString()] === 'super_interest'
@@ -171,12 +202,18 @@ export const getMatches = async (req, res) => {
     // Apply additional filters that require processing
     let filteredMatches = enrichedMatches;
 
-    if (nearby === 'true') {
+    if (nearby === 'true' || nearby === true) {
+      console.log('Applying nearby filter. Total matches before filter:', enrichedMatches.length);
+      console.log('Matches with isNearby=true:', enrichedMatches.filter(m => m.isNearby).length);
       filteredMatches = filteredMatches.filter(match => match.isNearby);
+      console.log('Matches after nearby filter:', filteredMatches.length);
     }
 
-    if (justJoined === 'true') {
-      filteredMatches = filteredMatches.filter(match => match.isJustJoined);
+    // Note: justJoined filter is now applied at database level, so no need to filter here
+
+    // Update totalMatches count if nearby filter was applied
+    if (nearby === 'true' || nearby === true) {
+      totalMatches = filteredMatches.length;
     }
 
     res.status(200).json({

@@ -25,6 +25,10 @@ const userSchema = new mongoose.Schema(
     state: String,
     city: String,
     location: String,
+    coordinates: {
+      lat: Number,
+      lng: Number
+    },
 
     // Step 2: Religious & Cultural Background
     religion: String,

@@ -1,4 +1,5 @@
 import User from "../models/User.js";
+import Interaction from "../models/Interaction.js";
 
 export const getAllProfiles = async (req, res) => {
   try {
@@ -230,6 +231,62 @@ export const filterProfiles = async (req, res) => {
       success: false,
       status: 500,
       message: "Server error while filtering profiles",
+      error: err.message,
+    });
+  }
+};
+
+// Get interest limits for a user
+export const getInterestLimits = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const user = await User.findById(userId).select('membership dailyInterests dailySuperInterests');
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Get today's usage
+    const todayInterests = await Interaction.countDocuments({
+      fromUser: userId,
+      type: 'interest',
+      createdAt: { $gte: today }
+    });
+
+    const todaySuperInterests = await Interaction.countDocuments({
+      fromUser: userId,
+      type: 'super_interest',
+      createdAt: { $gte: today }
+    });
+
+    // Check if user has premium membership
+    const hasUnlimitedInterests = user.membership && 
+      user.membership.plan && 
+      user.membership.isActive;
+
+    const hasUnlimitedSuperInterests = user.membership && 
+      user.membership.plan && 
+      user.membership.isActive;
+
+    return res.status(200).json({
+      success: true,
+      status: 200,
+      message: "Interest limits retrieved successfully",
+      data: {
+        freeInterests: hasUnlimitedInterests ? 'unlimited' : Math.max(0, 5 - todayInterests),
+        freeSuperInterests: hasUnlimitedSuperInterests ? 'unlimited' : Math.max(0, 1 - todaySuperInterests),
+        usedInterests: todayInterests,
+        usedSuperInterests: todaySuperInterests,
+        hasUnlimitedInterests,
+        hasUnlimitedSuperInterests
+      }
+    });
+
+  } catch (err) {
+    console.error("Get interest limits error:", err);
+    return res.status(500).json({
+      success: false,
+      status: 500,
+      message: "Server error while fetching interest limits",
       error: err.message,
     });
   }
