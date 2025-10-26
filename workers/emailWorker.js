@@ -62,7 +62,7 @@ const sendNotificationEmail = async (notification) => {
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #51365F;">Someone liked your profile!</h2>
           <p>Hello ${user.name},</p>
-          <p>Great news! Someone liked your profile on Bandhnam Nammatch.</p>
+          <p>Great news! Someone liked your profile on Bandhanam Nammatch.</p>
           <p>Log in to see who it was and start a conversation!</p>
           <div style="text-align: center; margin: 30px 0;">
             <a href="${process.env.FRONTEND_URL || "http://localhost:5173"}/login" 
@@ -70,7 +70,7 @@ const sendNotificationEmail = async (notification) => {
               View Profile
             </a>
           </div>
-          <p>Best regards,<br>Bandhnam Nammatch Team</p>
+          <p>Best regards,<br>Bandhanam Nammatch Team</p>
         </div>
       `;
       break;
@@ -81,7 +81,7 @@ const sendNotificationEmail = async (notification) => {
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #51365F;">Someone super liked your profile!</h2>
           <p>Hello ${user.name},</p>
-          <p>Amazing! Someone super liked your profile on Bandhnam Nammatch.</p>
+          <p>Amazing! Someone super liked your profile on Bandhanam Nammatch.</p>
           <p>This is special - log in to see who it was!</p>
           <div style="text-align: center; margin: 30px 0;">
             <a href="${process.env.FRONTEND_URL || "http://localhost:5173"}/login" 
@@ -89,7 +89,7 @@ const sendNotificationEmail = async (notification) => {
               View Profile
             </a>
           </div>
-          <p>Best regards,<br>Bandhnam Nammatch Team</p>
+          <p>Best regards,<br>Bandhanam Nammatch Team</p>
         </div>
       `;
       break;
@@ -100,7 +100,7 @@ const sendNotificationEmail = async (notification) => {
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #51365F;">It's a Match! 🎉</h2>
           <p>Hello ${user.name},</p>
-          <p>Congratulations! You have a new match on Bandhnam Nammatch.</p>
+          <p>Congratulations! You have a new match on Bandhanam Nammatch.</p>
           <p>You both liked each other - time to start a conversation!</p>
           <div style="text-align: center; margin: 30px 0;">
             <a href="${process.env.FRONTEND_URL || "http://localhost:5173"}/matches" 
@@ -108,7 +108,7 @@ const sendNotificationEmail = async (notification) => {
               View Match
             </a>
           </div>
-          <p>Best regards,<br>Bandhnam Nammatch Team</p>
+          <p>Best regards,<br>Bandhanam Nammatch Team</p>
         </div>
       `;
       break;
@@ -119,7 +119,7 @@ const sendNotificationEmail = async (notification) => {
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #51365F;">New Message</h2>
           <p>Hello ${user.name},</p>
-          <p>You have received a new message on Bandhnam Nammatch.</p>
+          <p>You have received a new message on Bandhanam Nammatch.</p>
           <p>Log in to read and reply!</p>
           <div style="text-align: center; margin: 30px 0;">
             <a href="${process.env.FRONTEND_URL || "http://localhost:5173"}/messages" 
@@ -127,7 +127,7 @@ const sendNotificationEmail = async (notification) => {
               View Messages
             </a>
           </div>
-          <p>Best regards,<br>Bandhnam Nammatch Team</p>
+          <p>Best regards,<br>Bandhanam Nammatch Team</p>
         </div>
       `;
       break;
@@ -145,7 +145,7 @@ const sendNotificationEmail = async (notification) => {
               View Profile
             </a>
           </div>
-          <p>Best regards,<br>Bandhnam Nammatch Team</p>
+          <p>Best regards,<br>Bandhanam Nammatch Team</p>
         </div>
       `;
       break;
@@ -163,7 +163,7 @@ const sendNotificationEmail = async (notification) => {
               Visit Site
             </a>
           </div>
-          <p>Best regards,<br>Bandhnam Nammatch Team</p>
+          <p>Best regards,<br>Bandhanam Nammatch Team</p>
         </div>
       `;
       break;
@@ -175,7 +175,7 @@ const sendNotificationEmail = async (notification) => {
           <h2 style="color: #51365F;">${title}</h2>
           <p>Hello ${user.name},</p>
           <p>${message}</p>
-          <p>Best regards,<br>Bandhnam Nammatch Team</p>
+          <p>Best regards,<br>Bandhanam Nammatch Team</p>
         </div>
       `;
   }
@@ -220,9 +220,9 @@ const sendWelcomeEmail = async (user) => {
 
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <h2 style="color: #51365F;">Welcome to Bandhnam Nammatch!</h2>
+      <h2 style="color: #51365F;">Welcome to Bandhanam Nammatch!</h2>
       <p>Hello ${name},</p>
-      <p>Thank you for registering with Bandhnam Nammatch - your journey to find the perfect partner begins now!</p>
+      <p>Thank you for registering with Bandhanam Nammatch - your journey to find the perfect partner begins now!</p>
       <p><strong>Your registration details:</strong></p>
       <ul>
         <li><strong>Name:</strong> ${name}</li>
@@ -237,11 +237,11 @@ const sendWelcomeEmail = async (user) => {
           Complete Profile
         </a>
       </div>
-      <p>Best regards,<br>Bandhnam Nammatch Team</p>
+      <p>Best regards,<br>Bandhanam Nammatch Team</p>
     </div>
   `;
 
-  await sendEmail(email, "Welcome to Bandhnam Nammatch!", html);
+  await sendEmail(email, "Welcome to Bandhanam Nammatch!", html);
 };
 
 // Process password reset emails
@@ -295,9 +295,9 @@ const sendPasswordResetEmail = async (user) => {
       <p style="word-break: break-all; color: #666;">${resetUrl}</p>
       <p>This link will expire in 1 hour.</p>
       <p>If you didn't request this reset, please ignore this email.</p>
-      <p>Best regards,<br>Bandhnam Nammatch Team</p>
+      <p>Best regards,<br>Bandhanam Nammatch Team</p>
     </div>
   `;
 
-  await sendEmail(user.email, "Password Reset - Bandhnam Nammatch", html);
+  await sendEmail(user.email, "Password Reset - Bandhanam Nammatch", html);
 };

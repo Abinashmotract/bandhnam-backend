@@ -28,14 +28,14 @@ export const createContact = async (req, res) => {
                 <p><strong>Message:</strong></p>
                 <p>${message}</p>
                 <br/>
-                <p style="color:#555;">Bandhnam Nammatch System</p>
+                <p style="color:#555;">Bandhanam Nammatch System</p>
             </div>
         `;
 
         // Send email to admin (support inbox)
         await sendEmail(
-            process.env.ADMIN_EMAIL || "support@bandhnam.com",
-            "New Contact Request - Bandhnam Nammatch",
+            process.env.ADMIN_EMAIL || "support@bandhanam.com",
+            "New Contact Request - Bandhanam Nammatch",
             html
         );
 
