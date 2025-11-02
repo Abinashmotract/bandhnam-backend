@@ -110,12 +110,10 @@ export const signup = async (req, res) => {
       agreeToTerms,
     } = req.body;
     if (!name || !email || !mobile || !password || !profileFor) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "All required fields must be provided",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "All required fields must be provided",
+      });
     }
     if (password !== confirmPassword) {
       return res
@@ -123,21 +121,17 @@ export const signup = async (req, res) => {
         .json({ success: false, message: "Passwords do not match" });
     }
     if (!agreeToTerms) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "You must agree to the terms and conditions",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "You must agree to the terms and conditions",
+      });
     }
     const phoneRegex = /^[0-9]{10}$/;
     if (!phoneRegex.test(mobile)) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Phone number must be exactly 10 digits",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Phone number must be exactly 10 digits",
+      });
     }
     const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
     if (!passwordRegex.test(password)) {
@@ -152,12 +146,10 @@ export const signup = async (req, res) => {
       $or: [{ email }, { phoneNumber: mobile }],
     });
     if (userExists) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "User with this email or phone number already exists",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "User with this email or phone number already exists",
+      });
     }
     // --- Hash password ---
     const hashed = await bcrypt.hash(password, 10);
@@ -376,67 +368,47 @@ export const logout = async (req, res) => {
 };
 
 export const getUserDetails = async (req, res) => {
-    try {
-        const user = await User.findById(req.user._id).select("-password -otp -otpExpiry -isOtpVerified");
-        if (!user) {
-            return res.status(404).json({
-                success: false,
-                statusCode: 404,
-                message: "User not found",
-            });
-        }
+  try {
+    const user = await User.findById(req.user._id).select(
+      "-password -otp -otpExpiry -isOtpVerified"
+    );
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        statusCode: 404,
+        message: "User not found",
+      });
+    }
 
-        // Ensure user has customId - generate if missing (backend-only generation)
-        if (!user.customId) {
-            // Import generateCustomId function (backend-only generation)
-            const generateCustomId = (await import('../middlewares/generateCustomId.js')).default;
-            user.customId = await generateCustomId();
-            await user.save();
-        }
-
-        const baseUrl = `${req.protocol}://${req.get("host")}`;
-
-        // Helper function to construct image URL
-        const getImageUrl = (imagePath) => {
-            if (!imagePath) return null;
-            // If already includes uploads/, use as is
-            if (imagePath.includes('uploads/') || imagePath.startsWith('uploads/')) {
-                return `${baseUrl}/${imagePath.startsWith('/') ? imagePath.slice(1) : imagePath}`;
-            }
-            // Otherwise, assume it's just a filename and add uploads/ prefix
-            return `${baseUrl}/uploads/${imagePath}`;
-        };
-
-        const userData = {
-            ...user.toObject(),
-            profileImage: getImageUrl(user.profileImage),
-            photos: user.photos?.map(photo => getImageUrl(photo)) || [],
-        };
-
-        return res.status(200).json({
-            success: true,
-            statusCode: 200,
-            message: "User details fetched successfully",
-            data: userData,
-        });
-    } catch (err) {
-        console.error("Get user details error:", err);
-        return res.status(500).json({
-            success: false,
-            statusCode: 500,
-            message: "Server error while fetching user details",
-            error: err.message,
-        });
+    // Ensure user has customId - generate if missing (backend-only generation)
+    if (!user.customId) {
+      // Import generateCustomId function (backend-only generation)
+      const generateCustomId = (
+        await import("../middlewares/generateCustomId.js")
+      ).default;
+      user.customId = await generateCustomId();
+      await user.save();
     }
 
     const baseUrl = `${req.protocol}://${req.get("host")}`;
 
+    // Helper function to construct image URL
+    const getImageUrl = (imagePath) => {
+      if (!imagePath) return null;
+      // If already includes uploads/, use as is
+      if (imagePath.includes("uploads/") || imagePath.startsWith("uploads/")) {
+        return `${baseUrl}/${
+          imagePath.startsWith("/") ? imagePath.slice(1) : imagePath
+        }`;
+      }
+      // Otherwise, assume it's just a filename and add uploads/ prefix
+      return `${baseUrl}/uploads/${imagePath}`;
+    };
+
     const userData = {
       ...user.toObject(),
-      profileImage: user.profileImage
-        ? `${baseUrl}/${user.profileImage}`
-        : null,
-      photos: user.photos?.map((photo) => `${baseUrl}/${photo}`) || [],
+      profileImage: getImageUrl(user.profileImage),
+      photos: user.photos?.map((photo) => getImageUrl(photo)) || [],
     };
 
     return res.status(200).json({
@@ -474,91 +446,14 @@ export const updateUser = async (req, res) => {
     preferences,
   } = req.body;
 
-    try {
-        const user = await User.findById(userId);
-        if (!user) {
-            return res.status(404).json({
-                success: false,
-                status: 404,
-                message: "User not found",
-            });
-        }
-        user.name = name || user.name;
-        user.email = email || user.email;
-        user.phoneNumber = phoneNumber || user.phoneNumber;
-        user.dob = dob || user.dob;
-        user.occupation = occupation || user.occupation;
-        user.location = location || user.location;
-        user.education = education || user.education;
-        // Handle motherTongue - it can be an array or undefined
-        // If it's provided (even as empty array), use it; otherwise keep existing
-        if (motherTongue !== undefined) {
-            // If it's already an array, use it; if it's a string, try to parse or wrap it
-            if (Array.isArray(motherTongue)) {
-                user.motherTongue = motherTongue;
-            } else if (typeof motherTongue === 'string') {
-                // If string, split by comma and trim
-                user.motherTongue = motherTongue.split(',').map(item => item.trim()).filter(item => item);
-            } else {
-                user.motherTongue = motherTongue;
-            }
-        }
-        user.religion = religion || user.religion;
-        user.caste = caste || user.caste;
-        user.about = about || user.about;
-        if (interests) {
-            try {
-                const parsedInterests = typeof interests === "string" ? JSON.parse(interests) : interests;
-                if (Array.isArray(parsedInterests)) {
-                    user.interests = parsedInterests;
-                }
-            } catch (error) {
-                console.error("Error parsing interests:", error);
-            }
-        }
-        if (req.files && req.files.photos) {
-            const photoFiles = Array.isArray(req.files.photos) ? req.files.photos : [req.files.photos];
-            photoFiles.forEach((file) => {
-                user.photos.push(file.path);
-            });
-        }
-        if (preferences) {
-            try {
-                const parsedPreferences = typeof preferences === "string" ? JSON.parse(preferences) : preferences;
-                
-                // Only update preferences that are provided and not undefined
-                const validPreferences = {};
-                Object.keys(parsedPreferences).forEach(key => {
-                    if (parsedPreferences[key] !== undefined && parsedPreferences[key] !== null) {
-                        validPreferences[key] = parsedPreferences[key];
-                    }
-                });
-                
-                // Merge with existing preferences
-                user.preferences = {
-                    ...user.preferences,
-                    ...validPreferences,
-                };
-            } catch (error) {
-                console.error("Error parsing preferences:", error);
-            }
-        }
-
-        await user.save();
-
-        res.status(200).json({
-            success: true,
-            status: 200,
-            message: "User updated successfully",
-        });
-    } catch (err) {
-        console.error("Update user error:", err);
-        res.status(500).json({
-            success: false,
-            status: 500,
-            message: "Server error",
-            error: err.message,
-        });
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        status: 404,
+        message: "User not found",
+      });
     }
     user.name = name || user.name;
     user.email = email || user.email;
@@ -567,7 +462,22 @@ export const updateUser = async (req, res) => {
     user.occupation = occupation || user.occupation;
     user.location = location || user.location;
     user.education = education || user.education;
-    user.motherTongue = motherTongue || user.motherTongue;
+    // Handle motherTongue - it can be an array or undefined
+    // If it's provided (even as empty array), use it; otherwise keep existing
+    if (motherTongue !== undefined) {
+      // If it's already an array, use it; if it's a string, try to parse or wrap it
+      if (Array.isArray(motherTongue)) {
+        user.motherTongue = motherTongue;
+      } else if (typeof motherTongue === "string") {
+        // If string, split by comma and trim
+        user.motherTongue = motherTongue
+          .split(",")
+          .map((item) => item.trim())
+          .filter((item) => item);
+      } else {
+        user.motherTongue = motherTongue;
+      }
+    }
     user.religion = religion || user.religion;
     user.caste = caste || user.caste;
     user.about = about || user.about;
@@ -634,6 +544,69 @@ export const updateUser = async (req, res) => {
       error: err.message,
     });
   }
+  user.name = name || user.name;
+  user.email = email || user.email;
+  user.phoneNumber = phoneNumber || user.phoneNumber;
+  user.dob = dob || user.dob;
+  user.occupation = occupation || user.occupation;
+  user.location = location || user.location;
+  user.education = education || user.education;
+  user.motherTongue = motherTongue || user.motherTongue;
+  user.religion = religion || user.religion;
+  user.caste = caste || user.caste;
+  user.about = about || user.about;
+  if (interests) {
+    try {
+      const parsedInterests =
+        typeof interests === "string" ? JSON.parse(interests) : interests;
+      if (Array.isArray(parsedInterests)) {
+        user.interests = parsedInterests;
+      }
+    } catch (error) {
+      console.error("Error parsing interests:", error);
+    }
+  }
+  if (req.files && req.files.photos) {
+    const photoFiles = Array.isArray(req.files.photos)
+      ? req.files.photos
+      : [req.files.photos];
+    photoFiles.forEach((file) => {
+      user.photos.push(file.path);
+    });
+  }
+  if (preferences) {
+    try {
+      const parsedPreferences =
+        typeof preferences === "string" ? JSON.parse(preferences) : preferences;
+
+      // Only update preferences that are provided and not undefined
+      const validPreferences = {};
+      Object.keys(parsedPreferences).forEach((key) => {
+        if (
+          parsedPreferences[key] !== undefined &&
+          parsedPreferences[key] !== null
+        ) {
+          validPreferences[key] = parsedPreferences[key];
+        }
+      });
+
+      // Merge with existing preferences
+      user.preferences = {
+        ...user.preferences,
+        ...validPreferences,
+      };
+    } catch (error) {
+      console.error("Error parsing preferences:", error);
+    }
+  }
+
+  await user.save();
+
+  res.status(200).json({
+    success: true,
+    status: 200,
+    message: "User updated successfully",
+  });
 };
 
 export const updateProfilePicture = async (req, res) => {
@@ -648,42 +621,47 @@ export const updateProfilePicture = async (req, res) => {
   try {
     const user = await User.findById(userId);
     if (!user) {
-        return res.status(404).json({
-            success: false,
-            status: 404,
-            message: "User not found",
-        });
+      return res.status(404).json({
+        success: false,
+        status: 404,
+        message: "User not found",
+      });
     }
     if (user.profileImage) {
-        // Old image path - construct properly with uploads/ directory
-        const oldImagePath = path.join(__dirname, '..', 'uploads', user.profileImage);
-        if (fs.existsSync(oldImagePath)) {
-            fs.unlinkSync(oldImagePath);
-        }
+      // Old image path - construct properly with uploads/ directory
+      const oldImagePath = path.join(
+        __dirname,
+        "..",
+        "uploads",
+        user.profileImage
+      );
+      if (fs.existsSync(oldImagePath)) {
+        fs.unlinkSync(oldImagePath);
+      }
     }
     // Store only the filename or relative path (without full path)
     // req.file.path might be like "uploads/filename.png" or just "filename.png"
-    const imagePath = req.file.path.includes('uploads/') 
-        ? req.file.path.replace(/^.*uploads\//, 'uploads/') 
-        : `uploads/${req.file.filename}`;
+    const imagePath = req.file.path.includes("uploads/")
+      ? req.file.path.replace(/^.*uploads\//, "uploads/")
+      : `uploads/${req.file.filename}`;
     user.profileImage = req.file.filename; // Store just filename in DB
     await user.save();
     const baseUrl = `${req.protocol}://${req.get("host")}`;
     res.status(200).json({
-        success: true,
-        status: 200,
-        message: "Profile picture updated successfully",
-        data: {
-            profileImage: `${baseUrl}/uploads/${user.profileImage}`,
-        },
+      success: true,
+      status: 200,
+      message: "Profile picture updated successfully",
+      data: {
+        profileImage: `${baseUrl}/uploads/${user.profileImage}`,
+      },
     });
   } catch (err) {
     console.error("Update profile picture error:", err);
     res.status(500).json({
-        success: false,
-        status: 500,
-        message: "Server error",
-        error: err.message,
+      success: false,
+      status: 500,
+      message: "Server error",
+      error: err.message,
     });
   }
 };
@@ -754,23 +732,19 @@ export const resendOtp = async (req, res) => {
   try {
     const user = await User.findOne({ email });
     if (!user)
-      return res
-        .status(200)
-        .json({
-          success: true,
-          status: 200,
-          message: "If the email exists, a new OTP has been sent",
-        });
+      return res.status(200).json({
+        success: true,
+        status: 200,
+        message: "If the email exists, a new OTP has been sent",
+      });
 
     if (user.otpExpiry > Date.now() && user.otp) {
       const minutesLeft = Math.ceil((user.otpExpiry - Date.now()) / 1000 / 60);
-      return res
-        .status(429)
-        .json({
-          success: false,
-          status: 429,
-          message: `Wait ${minutesLeft} min before requesting new OTP`,
-        });
+      return res.status(429).json({
+        success: false,
+        status: 429,
+        message: `Wait ${minutesLeft} min before requesting new OTP`,
+      });
     }
 
     const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -798,23 +772,19 @@ export const resendOtp = async (req, res) => {
       html
     );
 
-    res
-      .status(200)
-      .json({
-        success: true,
-        status: 200,
-        message: "New OTP sent successfully",
-      });
+    res.status(200).json({
+      success: true,
+      status: 200,
+      message: "New OTP sent successfully",
+    });
   } catch (err) {
     console.error("Resend OTP error:", err);
-    res
-      .status(500)
-      .json({
-        success: false,
-        status: 500,
-        message: "Server error",
-        error: err.message,
-      });
+    res.status(500).json({
+      success: false,
+      status: 500,
+      message: "Server error",
+      error: err.message,
+    });
   }
 };
 
@@ -822,24 +792,20 @@ export const resendOtp = async (req, res) => {
 export const verifyOtp = async (req, res) => {
   const { email, otp } = req.body;
   if (!email || !otp)
-    return res
-      .status(400)
-      .json({
-        success: false,
-        status: 400,
-        message: "Email and OTP are required",
-      });
+    return res.status(400).json({
+      success: false,
+      status: 400,
+      message: "Email and OTP are required",
+    });
 
   try {
     const user = await User.findOne({ email });
     if (!user || user.otp !== otp || user.otpExpiry < Date.now()) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          status: 400,
-          message: "Invalid or expired OTP",
-        });
+      return res.status(400).json({
+        success: false,
+        status: 400,
+        message: "Invalid or expired OTP",
+      });
     }
 
     user.isOtpVerified = true;
@@ -871,14 +837,12 @@ export const verifyOtp = async (req, res) => {
     });
   } catch (err) {
     console.error("Verify OTP error:", err);
-    res
-      .status(500)
-      .json({
-        success: false,
-        status: 500,
-        message: "Server error",
-        error: err.message,
-      });
+    res.status(500).json({
+      success: false,
+      status: 500,
+      message: "Server error",
+      error: err.message,
+    });
   }
 };
 
@@ -886,13 +850,11 @@ export const verifyOtp = async (req, res) => {
 export const resetPassword = async (req, res) => {
   const { email, newPassword, confirmPassword, resetToken } = req.body;
   if (!email || !newPassword || !confirmPassword)
-    return res
-      .status(400)
-      .json({
-        success: false,
-        status: 400,
-        message: "Email, new password and confirmation are required",
-      });
+    return res.status(400).json({
+      success: false,
+      status: 400,
+      message: "Email, new password and confirmation are required",
+    });
   if (newPassword !== confirmPassword)
     return res
       .status(400)
@@ -900,13 +862,11 @@ export const resetPassword = async (req, res) => {
 
   const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
   if (!passwordRegex.test(newPassword))
-    return res
-      .status(400)
-      .json({
-        success: false,
-        status: 400,
-        message: "Password must meet complexity requirements",
-      });
+    return res.status(400).json({
+      success: false,
+      status: 400,
+      message: "Password must meet complexity requirements",
+    });
 
   try {
     const user = await User.findOne({ email });
@@ -931,22 +891,18 @@ export const resetPassword = async (req, res) => {
           decoded.userId !== user._id.toString() ||
           decoded.purpose !== "password_reset"
         ) {
-          return res
-            .status(403)
-            .json({
-              success: false,
-              status: 403,
-              message: "Invalid reset token",
-            });
-        }
-      } catch {
-        return res
-          .status(403)
-          .json({
+          return res.status(403).json({
             success: false,
             status: 403,
-            message: "Invalid or expired reset token",
+            message: "Invalid reset token",
           });
+        }
+      } catch {
+        return res.status(403).json({
+          success: false,
+          status: 403,
+          message: "Invalid or expired reset token",
+        });
       }
     }
 
@@ -972,23 +928,19 @@ export const resetPassword = async (req, res) => {
       html
     );
 
-    res
-      .status(200)
-      .json({
-        success: true,
-        status: 200,
-        message: "Password reset successful",
-      });
+    res.status(200).json({
+      success: true,
+      status: 200,
+      message: "Password reset successful",
+    });
   } catch (err) {
     console.error("Reset password error:", err);
-    res
-      .status(500)
-      .json({
-        success: false,
-        status: 500,
-        message: "Server error",
-        error: err.message,
-      });
+    res.status(500).json({
+      success: false,
+      status: 500,
+      message: "Server error",
+      error: err.message,
+    });
   }
 };
 
