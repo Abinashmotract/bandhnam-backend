@@ -1,6 +1,17 @@
 import User from "../models/User.js";
 import Interaction from "../models/Interaction.js";
 
+// Helper function to construct image URL with uploads/ path
+const getImageUrl = (baseUrl, imagePath) => {
+  if (!imagePath) return null;
+  // If already includes uploads/, use as is
+  if (imagePath.includes('uploads/') || imagePath.startsWith('uploads/')) {
+    return `${baseUrl}/${imagePath.startsWith('/') ? imagePath.slice(1) : imagePath}`;
+  }
+  // Otherwise, assume it's just a filename and add uploads/ prefix
+  return `${baseUrl}/uploads/${imagePath}`;
+};
+
 export const getAllProfiles = async (req, res) => {
   try {
     const currentUserId = req.user._id;
@@ -23,8 +34,8 @@ export const getAllProfiles = async (req, res) => {
       religion: u.religion,
       caste: u.caste,
       about: u.about,
-      profileImage: u.profileImage ? `${baseUrl}/${u.profileImage}` : null,
-      photos: u.photos?.map(photo => `${baseUrl}/${photo}`) || []
+      profileImage: getImageUrl(baseUrl, u.profileImage),
+      photos: u.photos?.map(photo => getImageUrl(baseUrl, photo)) || []
     }));
 
     return res.status(200).json({
@@ -139,8 +150,8 @@ export const getMatchedProfiles = async (req, res) => {
         caste: u.caste,
         about: u.about,
         matchScore,
-        profileImage: u.profileImage ? `${baseUrl}/${u.profileImage}` : null,
-        photos: u.photos?.map((photo) => `${baseUrl}/${photo}`) || [],
+        profileImage: getImageUrl(baseUrl, u.profileImage),
+        photos: u.photos?.map((photo) => getImageUrl(baseUrl, photo)) || [],
       };
     });
 
@@ -215,8 +226,8 @@ export const filterProfiles = async (req, res) => {
       religion: u.religion,
       caste: u.caste,
       about: u.about,
-      profileImage: u.profileImage ? `${baseUrl}/${u.profileImage}` : null,
-      photos: u.photos?.map(photo => `${baseUrl}/${photo}`) || []
+      profileImage: getImageUrl(baseUrl, u.profileImage),
+      photos: u.photos?.map(photo => getImageUrl(baseUrl, photo)) || []
     }));
 
     return res.status(200).json({

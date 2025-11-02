@@ -24,7 +24,8 @@ const generateCustomId = async () => {
 
 // Middleware to generate custom ID before saving
 export const generateUserIdMiddleware = async function(next) {
-  if (this.isNew && !this.customId) {
+  // Generate customId for new users OR existing users who don't have one
+  if (!this.customId) {
     this.customId = await generateCustomId();
   }
   next();

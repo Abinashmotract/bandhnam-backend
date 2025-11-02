@@ -267,12 +267,31 @@ export const getUserDetails = async (req, res) => {
             });
         }
 
+        // Ensure user has customId - generate if missing (backend-only generation)
+        if (!user.customId) {
+            // Import generateCustomId function (backend-only generation)
+            const generateCustomId = (await import('../middlewares/generateCustomId.js')).default;
+            user.customId = await generateCustomId();
+            await user.save();
+        }
+
         const baseUrl = `${req.protocol}://${req.get("host")}`;
+
+        // Helper function to construct image URL
+        const getImageUrl = (imagePath) => {
+            if (!imagePath) return null;
+            // If already includes uploads/, use as is
+            if (imagePath.includes('uploads/') || imagePath.startsWith('uploads/')) {
+                return `${baseUrl}/${imagePath.startsWith('/') ? imagePath.slice(1) : imagePath}`;
+            }
+            // Otherwise, assume it's just a filename and add uploads/ prefix
+            return `${baseUrl}/uploads/${imagePath}`;
+        };
 
         const userData = {
             ...user.toObject(),
-            profileImage: user.profileImage ? `${baseUrl}/${user.profileImage}` : null,
-            photos: user.photos?.map(photo => `${baseUrl}/${photo}`) || [],
+            profileImage: getImageUrl(user.profileImage),
+            photos: user.photos?.map(photo => getImageUrl(photo)) || [],
         };
 
         return res.status(200).json({
@@ -326,7 +345,19 @@ export const updateUser = async (req, res) => {
         user.occupation = occupation || user.occupation;
         user.location = location || user.location;
         user.education = education || user.education;
-        user.motherTongue = motherTongue || user.motherTongue;
+        // Handle motherTongue - it can be an array or undefined
+        // If it's provided (even as empty array), use it; otherwise keep existing
+        if (motherTongue !== undefined) {
+            // If it's already an array, use it; if it's a string, try to parse or wrap it
+            if (Array.isArray(motherTongue)) {
+                user.motherTongue = motherTongue;
+            } else if (typeof motherTongue === 'string') {
+                // If string, split by comma and trim
+                user.motherTongue = motherTongue.split(',').map(item => item.trim()).filter(item => item);
+            } else {
+                user.motherTongue = motherTongue;
+            }
+        }
         user.religion = religion || user.religion;
         user.caste = caste || user.caste;
         user.about = about || user.about;
@@ -405,12 +436,18 @@ export const updateProfilePicture = async (req, res) => {
             });
         }
         if (user.profileImage) {
-            const oldImagePath = path.resolve(__dirname, "..", user.profileImage);
+            // Old image path - construct properly with uploads/ directory
+            const oldImagePath = path.join(__dirname, '..', 'uploads', user.profileImage);
             if (fs.existsSync(oldImagePath)) {
                 fs.unlinkSync(oldImagePath);
             }
         }
-        user.profileImage = req.file.path;
+        // Store only the filename or relative path (without full path)
+        // req.file.path might be like "uploads/filename.png" or just "filename.png"
+        const imagePath = req.file.path.includes('uploads/') 
+            ? req.file.path.replace(/^.*uploads\//, 'uploads/') 
+            : `uploads/${req.file.filename}`;
+        user.profileImage = req.file.filename; // Store just filename in DB
         await user.save();
         const baseUrl = `${req.protocol}://${req.get("host")}`;
         res.status(200).json({
@@ -418,7 +455,7 @@ export const updateProfilePicture = async (req, res) => {
             status: 200,
             message: "Profile picture updated successfully",
             data: {
-                profileImage: `${baseUrl}/${user.profileImage}`,
+                profileImage: `${baseUrl}/uploads/${user.profileImage}`,
             },
         });
     } catch (err) {
