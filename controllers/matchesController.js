@@ -20,13 +20,19 @@ export const getMatches = async (req, res) => {
       caste = '',
       occupation = '',
       location = '',
-      sortBy = 'recentlyJoined'
+      sortBy = 'recentlyJoined',
+      heightMin = '',
+      heightMax = '',
+      maritalStatus = '',
+      motherTongue = '',
+      education = '',
+      annualIncome = ''
     } = req.query;
 
     console.log('Request parameters:', { nearby, verified, justJoined });
 
-    // Get current user's preferences for matching
-    const currentUser = await User.findById(userId).select('preferences location gender');
+    // Get current user's preferences and location for matching
+    const currentUser = await User.findById(userId).select('preferences location gender city state coordinates');
     if (!currentUser) {
       return res.status(404).json({
         success: false,
@@ -59,11 +65,9 @@ export const getMatches = async (req, res) => {
     };
 
     // Additional filters
-    if (verified === 'true') {
-      matchQuery.isEmailVerified = true;
-    }
-
-    if (justJoined === 'true') {
+    // Note: Verified filter is applied in post-processing to check multiple verification types
+    
+    if (justJoined === 'true' || justJoined === true) {
       // Filter for users who joined within the last 7 days
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -82,22 +86,73 @@ export const getMatches = async (req, res) => {
       matchQuery.occupation = { $regex: occupation, $options: 'i' };
     }
 
+    // Location filter
     if (location) {
-      matchQuery.$or = [
-        { city: { $regex: location, $options: 'i' } },
-        { state: { $regex: location, $options: 'i' } },
-        { location: { $regex: location, $options: 'i' } }
-      ];
+      if (matchQuery.$or) {
+        // Merge with existing $or conditions if search is also present
+        matchQuery.$or = [
+          ...matchQuery.$or,
+          { city: { $regex: location, $options: 'i' } },
+          { state: { $regex: location, $options: 'i' } },
+          { location: { $regex: location, $options: 'i' } }
+        ];
+      } else {
+        matchQuery.$or = [
+          { city: { $regex: location, $options: 'i' } },
+          { state: { $regex: location, $options: 'i' } },
+          { location: { $regex: location, $options: 'i' } }
+        ];
+      }
+    }
+
+    // Height filter
+    if (heightMin || heightMax) {
+      matchQuery.height = {};
+      if (heightMin) matchQuery.height.$gte = heightMin;
+      if (heightMax) matchQuery.height.$lte = heightMax;
+    }
+
+    // Marital Status filter
+    if (maritalStatus) {
+      const statusArray = maritalStatus.split(',').map(s => s.trim().toLowerCase().replace(/\s+/g, '_'));
+      if (statusArray.length > 0) {
+        matchQuery.maritalStatus = { $in: statusArray };
+      }
+    }
+
+    // Mother Tongue filter
+    if (motherTongue) {
+      const tongueArray = motherTongue.split(',').map(t => t.trim().toLowerCase());
+      if (tongueArray.length > 0) {
+        matchQuery.motherTongue = { $in: tongueArray };
+      }
+    }
+
+    // Education filter
+    if (education) {
+      matchQuery.education = { $regex: education, $options: 'i' };
+    }
+
+    // Annual Income filter
+    if (annualIncome) {
+      matchQuery.annualIncome = { $regex: annualIncome, $options: 'i' };
     }
 
     // Search filter
     if (search) {
-      matchQuery.$or = [
+      const searchConditions = [
         { name: { $regex: search, $options: 'i' } },
         { occupation: { $regex: search, $options: 'i' } },
         { city: { $regex: search, $options: 'i' } },
         { state: { $regex: search, $options: 'i' } }
       ];
+      
+      if (matchQuery.$or) {
+        // Merge with existing $or conditions from location filter
+        matchQuery.$or = [...matchQuery.$or, ...searchConditions];
+      } else {
+        matchQuery.$or = searchConditions;
+      }
     }
 
     // Calculate skip value for pagination
@@ -202,17 +257,28 @@ export const getMatches = async (req, res) => {
     // Apply additional filters that require processing
     let filteredMatches = enrichedMatches;
 
+    // Verified filter - check if profile has any verification
+    if (verified === 'true' || verified === true) {
+      filteredMatches = filteredMatches.filter(match => 
+        match.isEmailVerified || 
+        match.isPhoneVerified || 
+        match.isIdVerified || 
+        match.isPhotoVerified
+      );
+    }
+
+    // Nearby filter
     if (nearby === 'true' || nearby === true) {
-      console.log('Applying nearby filter. Total matches before filter:', enrichedMatches.length);
-      console.log('Matches with isNearby=true:', enrichedMatches.filter(m => m.isNearby).length);
+      console.log('Applying nearby filter. Total matches before filter:', filteredMatches.length);
+      console.log('Matches with isNearby=true:', filteredMatches.filter(m => m.isNearby).length);
       filteredMatches = filteredMatches.filter(match => match.isNearby);
       console.log('Matches after nearby filter:', filteredMatches.length);
     }
 
     // Note: justJoined filter is now applied at database level, so no need to filter here
 
-    // Update totalMatches count if nearby filter was applied
-    if (nearby === 'true' || nearby === true) {
+    // Update totalMatches count if post-processing filters were applied
+    if ((nearby === 'true' || nearby === true) || (verified === 'true' || verified === true)) {
       totalMatches = filteredMatches.length;
     }
 
