@@ -8,9 +8,6 @@ import { VerifyToken } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
 
-// Test route without authentication
-router.get('/criteria/test', getSearchCriteria);
-
 // Get search criteria options
 router.get('/criteria', VerifyToken, getSearchCriteria);
 

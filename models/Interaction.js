@@ -13,7 +13,7 @@ const interactionSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ["like", "superlike", "favourite", "block", "report", "visit", "interest", "shortlist", "message", "verification", "success_story"],
+    enum: ["like", "superlike", "favourite", "block", "report", "visit", "interest", "shortlist", "message", "verification", "success_story" , "super_interest"],
     required: true
   },
   status: {

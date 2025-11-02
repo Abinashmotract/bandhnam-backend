@@ -93,6 +93,7 @@ export const searchByCriteria = async (req, res) => {
       annualIncomeMin,
       annualIncomeMax,
       country,
+      state,
       city,
       showProfiles,
       manglik,
@@ -154,6 +155,10 @@ export const searchByCriteria = async (req, res) => {
 
     if (country && country !== 'Doesn\'t Matter') {
       query.country = country;
+    }
+
+    if (state && state !== 'Doesn\'t Matter') {
+      query.state = { $regex: state, $options: 'i' };
     }
 
     if (city && city !== 'Doesn\'t Matter') {
@@ -269,6 +274,63 @@ export const searchByProfileId = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to search by profile ID',
+      error: error.message
+    });
+  }
+};
+
+// Search users by typing their ID or name
+export const searchByIdOrName = async (req, res) => {
+  try {
+    const { searchQuery } = req.query;
+    const userId = req.user.id;
+
+    if (!searchQuery || searchQuery.length < 2) {
+      return res.status(400).json({
+        success: false,
+        message: 'Search query must be at least 2 characters long'
+      });
+    }
+
+    // Search by customId, name, or _id
+    const profiles = await User.find({
+      $and: [
+        { _id: { $ne: userId } }, // Exclude current user
+        { isActive: true },
+        {
+          $or: [
+            { customId: { $regex: searchQuery, $options: 'i' } },
+            { name: { $regex: searchQuery, $options: 'i' } },
+            { _id: searchQuery.match(/^[0-9a-fA-F]{24}$/) ? searchQuery : null }
+          ]
+        }
+      ]
+    })
+    .select('name profileImage customId age height maritalStatus religion education occupation city state')
+    .limit(10);
+
+    res.status(200).json({
+      success: true,
+      data: profiles.map(profile => ({
+        id: profile._id,
+        name: profile.name,
+        customId: profile.customId,
+        profileImage: profile.profileImage,
+        age: profile.age,
+        height: profile.height,
+        maritalStatus: profile.maritalStatus,
+        religion: profile.religion,
+        education: profile.education,
+        occupation: profile.occupation,
+        location: `${profile.city}${profile.state ? ', ' + profile.state : ''}`
+      }))
+    });
+
+  } catch (error) {
+    console.error('Error searching by ID or name:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to search profiles',
       error: error.message
     });
   }

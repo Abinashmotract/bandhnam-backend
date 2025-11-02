@@ -188,6 +188,7 @@ export const refreshAccessToken = async (req, res) => {
     }
     try {
         const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+        console.log("Refresh token decoded:", decoded);
         const user = await User.findById(decoded.id);
         if (!user) {
             return res.status(403).json({
@@ -196,6 +197,7 @@ export const refreshAccessToken = async (req, res) => {
                 message: "User not found",
             });
         }
+        console.log("User found:", user);
         const newAccessToken = generateAccessToken(user._id);
         const newRefreshToken = generateRefreshToken(user._id);
 
@@ -550,7 +552,7 @@ export const verifyOtp = async (req, res) => {
         const resetToken = jwt.sign(
             { userId: user._id, purpose: "password_reset" },
             process.env.JWT_SECRET || "your-secret-key",
-            { expiresIn: "15m" }
+            { expiresIn: "7d" }
         );
 
         // Optional: send confirmation email that OTP verified

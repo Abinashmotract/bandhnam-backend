@@ -12,7 +12,15 @@ const userSchema = new mongoose.Schema(
     profileFor: {
       type: String,
       required: true,
-      enum: ["self", "son", "daughter", "brother", "sister", "relative", "friend"],
+      enum: [
+        "self",
+        "son",
+        "daughter",
+        "brother",
+        "sister",
+        "relative",
+        "friend",
+      ],
     },
     gender: {
       type: String,
@@ -27,7 +35,7 @@ const userSchema = new mongoose.Schema(
     location: String,
     coordinates: {
       lat: Number,
-      lng: Number
+      lng: Number,
     },
 
     // Step 2: Religious & Cultural Background
@@ -69,13 +77,13 @@ const userSchema = new mongoose.Schema(
         max: { type: Number, default: 35 },
       },
       height: String, // old
-      heightRange: { 
+      heightRange: {
         type: {
           min: String,
-          max: String
+          max: String,
         },
         required: false,
-        default: undefined
+        default: undefined,
       }, // new
       maritalStatus: String, // old
       religion: String, // old
@@ -92,10 +100,10 @@ const userSchema = new mongoose.Schema(
         type: {
           diet: String,
           drinking: String,
-          smoking: String
+          smoking: String,
         },
         required: false,
-        default: undefined
+        default: undefined,
       },
       religionCastePref: String,
       locationPref: String,
@@ -134,74 +142,94 @@ const userSchema = new mongoose.Schema(
     isPhoneVerified: { type: Boolean, default: false },
     isIdVerified: { type: Boolean, default: false },
     isPhotoVerified: { type: Boolean, default: false },
-    
+
     // Online status
     isOnline: { type: Boolean, default: false },
     lastSeen: { type: Date, default: Date.now },
-    
+
     // Email verification
     emailVerificationToken: String,
     emailVerificationExpires: Date,
-    
+
     // Phone verification
     phoneVerificationOTP: String,
     phoneVerificationExpires: Date,
-    
+
     // ID verification
     idVerification: {
       documentType: String,
       documentNumber: String,
       frontImage: String,
       backImage: String,
-      status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
+      status: {
+        type: String,
+        enum: ["pending", "approved", "rejected"],
+        default: "pending",
+      },
       submittedAt: Date,
       reviewedAt: Date,
-      reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-      rejectionReason: String
+      reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      rejectionReason: String,
     },
-    
+
     // Photo verification
     photoVerification: {
       photos: [String],
-      status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
+      status: {
+        type: String,
+        enum: ["pending", "approved", "rejected"],
+        default: "pending",
+      },
       submittedAt: Date,
       reviewedAt: Date,
-      reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-      rejectionReason: String
+      reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      rejectionReason: String,
     },
-    
+
     profileCompletion: { type: Number, default: 0 },
-    
+
     // Account status
     isActive: { type: Boolean, default: true },
     banReason: String,
     banExpiry: Date,
     adminNotes: String,
-    
+
     // Membership information
     membership: {
       plan: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'MembershipPlan'
+        ref: "MembershipPlan",
       },
       startDate: Date,
       endDate: Date,
-      isActive: { type: Boolean, default: false }
+      isActive: { type: Boolean, default: false },
     },
-    
+
     // Interaction data
-    likes: [{
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
-    }],
-    dislikes: [{
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
-    }],
-    shortlists: [{
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
-    }],
+    likes: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+    dislikes: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+    shortlists: [
+      {
+        userId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+        },
+        shortlistedAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
   },
   { timestamps: true }
 );
@@ -295,6 +323,6 @@ userSchema.pre("save", function (next) {
 });
 
 // Add middleware to generate custom ID before saving
-userSchema.pre('save', generateUserIdMiddleware);
+userSchema.pre("save", generateUserIdMiddleware);
 
 export default mongoose.model("User", userSchema);
