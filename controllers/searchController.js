@@ -1,5 +1,6 @@
 import User from "../models/User.js";
 import SearchFilter from "../models/SearchFilter.js";
+import mongoose from "mongoose";
 
 // Get search criteria options
 export const getSearchCriteria = async (req, res) => {
@@ -312,20 +313,32 @@ export const searchByProfileId = async (req, res) => {
     const userId = req.user.id;
     const { profileId } = req.params;
 
-    const profile = await User.findOne({
-      $or: [{ customId: profileId }, { _id: profileId }],
-      _id: { $ne: userId },
-    }).select(
-      "name profileImage customId age height maritalStatus religion caste motherTongue annualIncome country city manglik diet education occupation about"
-    );
-
-    if (!profile) {
-      return res.status(404).json({
+    if (mongoose.Types.ObjectId.isValid(profileId)) {
+      return res.status(400).json({
         success: false,
-        message: "Profile not found",
+        message: "Invalid request. Use customId, not MongoDB _id.",
       });
     }
 
+    // ✅ Find user by customId
+    const profile = await User.findOne({ customId: profileId }).select(
+      "name profileImage customId age height maritalStatus religion caste motherTongue annualIncome country city manglik diet education occupation about _id"
+    );
+
+    // ❌ If no user found with that customId
+    if (!profile) {
+      return res.status(404).json({
+        success: false,
+        message: "Profile not found.",
+      });
+    }
+    // ❌ If the found profile belongs to the same user (own profile)
+    if (profile._id.toString() === userId.toString()) {
+      return res.status(400).json({
+        success: false,
+        message: "You cannot search your own profile.",
+      });
+    }
     res.status(200).json({
       success: true,
       data: {
