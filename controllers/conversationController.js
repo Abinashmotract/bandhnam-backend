@@ -16,50 +16,102 @@ export const getConversations = async (req, res) => {
         targetUser: userId,
         status: 'accepted'
       })
-      .populate('fromUser', 'name profileImage customId age height caste location')
+      .populate('fromUser', 'name profileImage customId age height caste location isOnline lastSeen')
       .sort({ createdAt: -1 });
 
-      conversations = acceptedInterests.map(interest => ({
-        id: interest._id,
-        type: 'acceptance',
-        user: {
-          id: interest.fromUser._id,
-          name: interest.fromUser.name,
-          age: interest.fromUser.age,
-          height: interest.fromUser.height,
-          caste: interest.fromUser.caste,
-          location: interest.fromUser.location,
-          profileImage: interest.fromUser.profileImage,
-          customId: interest.fromUser.customId
-        },
-        createdAt: interest.createdAt,
-        message: interest.message
-      }));
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+
+      // Get last messages for each conversation
+      const conversationPromises = acceptedInterests.map(async (interest) => {
+        const otherUserId = interest.fromUser._id;
+        
+        // Get last message between users
+        const lastMessage = await Message.findOne({
+          $or: [
+            { sender: userId, receiver: otherUserId },
+            { sender: otherUserId, receiver: userId }
+          ]
+        })
+        .sort({ createdAt: -1 })
+        .select('content createdAt')
+        .lean();
+
+        return {
+          id: interest._id,
+          type: 'acceptance',
+          user: {
+            id: interest.fromUser._id,
+            name: interest.fromUser.name,
+            age: interest.fromUser.age,
+            height: interest.fromUser.height,
+            caste: interest.fromUser.caste,
+            location: interest.fromUser.location,
+            profileImage: getImageUrl(baseUrl, interest.fromUser.profileImage),
+            customId: interest.fromUser.customId,
+            isOnline: interest.fromUser.isOnline || false,
+            lastSeen: interest.fromUser.lastSeen
+          },
+          createdAt: interest.createdAt,
+          message: interest.message,
+          lastMessage: lastMessage ? {
+            content: lastMessage.content,
+            createdAt: lastMessage.createdAt
+          } : null
+        };
+      });
+
+      conversations = await Promise.all(conversationPromises);
     } else if (tab === 'interests') {
       // Get interests sent by current user
       const interests = await Interest.find({
         fromUser: userId
       })
-      .populate('targetUser', 'name profileImage customId age height caste location')
+      .populate('targetUser', 'name profileImage customId age height caste location isOnline lastSeen')
       .sort({ createdAt: -1 });
 
-      conversations = interests.map(interest => ({
-        id: interest._id,
-        type: 'interest',
-        user: {
-          id: interest.targetUser._id,
-          name: interest.targetUser.name,
-          age: interest.targetUser.age,
-          height: interest.targetUser.height,
-          caste: interest.targetUser.caste,
-          location: interest.targetUser.location,
-          profileImage: interest.targetUser.profileImage,
-          customId: interest.targetUser.customId
-        },
-        createdAt: interest.createdAt,
-        message: interest.message,
-        status: interest.status
-      }));
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+
+      // Get last messages for each conversation
+      const conversationPromises = interests.map(async (interest) => {
+        const otherUserId = interest.targetUser._id;
+        
+        // Get last message between users
+        const lastMessage = await Message.findOne({
+          $or: [
+            { sender: userId, receiver: otherUserId },
+            { sender: otherUserId, receiver: userId }
+          ]
+        })
+        .sort({ createdAt: -1 })
+        .select('content createdAt')
+        .lean();
+
+        return {
+          id: interest._id,
+          type: 'interest',
+          user: {
+            id: interest.targetUser._id,
+            name: interest.targetUser.name,
+            age: interest.targetUser.age,
+            height: interest.targetUser.height,
+            caste: interest.targetUser.caste,
+            location: interest.targetUser.location,
+            profileImage: getImageUrl(baseUrl, interest.targetUser.profileImage),
+            customId: interest.targetUser.customId,
+            isOnline: interest.targetUser.isOnline || false,
+            lastSeen: interest.targetUser.lastSeen
+          },
+          createdAt: interest.createdAt,
+          message: interest.message,
+          status: interest.status,
+          lastMessage: lastMessage ? {
+            content: lastMessage.content,
+            createdAt: lastMessage.createdAt
+          } : null
+        };
+      });
+
+      conversations = await Promise.all(conversationPromises);
     } else if (tab === 'calls') {
       // Get call history (if we have a calls model)
       // For now, return empty array
@@ -115,22 +167,49 @@ export const getMessengerOnlineMatches = async (req, res) => {
     const userId = req.user.id;
     const { limit = 22 } = req.query;
 
-    const onlineMatches = await User.find({
+    // Get current user's gender for filtering opposite gender matches
+    const currentUser = await User.findById(userId).select('gender');
+    
+    let matchQuery = {
       _id: { $ne: userId },
-      isOnline: true
-    })
-    .limit(parseInt(limit))
-    .select('name profileImage customId isOnline')
-    .sort({ lastSeen: -1 });
+      isOnline: true,
+      isActive: true
+    };
+
+    // Filter by opposite gender
+    if (currentUser?.gender === 'male') {
+      matchQuery.gender = 'female';
+    } else if (currentUser?.gender === 'female') {
+      matchQuery.gender = 'male';
+    }
+
+    const onlineMatches = await User.find(matchQuery)
+      .limit(parseInt(limit))
+      .select('name profileImage customId isOnline lastSeen gender')
+      .sort({ lastSeen: -1 });
+
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+
+    const getImageUrl = (imagePath) => {
+      if (!imagePath) return null;
+      if (imagePath.startsWith('http')) return imagePath;
+      if (imagePath.startsWith('uploads/') || imagePath.startsWith('/uploads/')) {
+        return `${baseUrl}/${imagePath.startsWith('/') ? imagePath.slice(1) : imagePath}`;
+      }
+      return `${baseUrl}/uploads/${imagePath}`;
+    };
 
     res.status(200).json({
       success: true,
       data: onlineMatches.map(match => ({
         id: match._id,
+        _id: match._id,
         name: match.name,
         customId: match.customId,
-        profileImage: match.profileImage,
-        isOnline: match.isOnline
+        profileImage: getImageUrl(match.profileImage),
+        avatar: getImageUrl(match.profileImage),
+        isOnline: match.isOnline || true,
+        lastSeen: match.lastSeen
       }))
     });
   } catch (error) {

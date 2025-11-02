@@ -308,7 +308,7 @@ export const getMatches = async (req, res) => {
 // Show interest in a profile
 export const showInterest = async (req, res) => {
   try {
-    const { profileId } = req.body;
+    const { profileId, message } = req.body;
     const fromUserId = req.user.id;
 
     if (!profileId) {
@@ -377,10 +377,64 @@ export const showInterest = async (req, res) => {
       fromUser: fromUserId,
       toUser: profileId,
       type: 'interest',
-      status: 'sent'
+      status: 'sent',
+      messageContent: message || null
     });
 
     await interest.save();
+
+    // Also create Interest record for the Interest model used by conversations
+    try {
+      const Interest = (await import('../models/Interest.js')).default;
+      const interestRecord = new Interest({
+        fromUser: fromUserId,
+        targetUser: profileId,
+        type: 'interest',
+        status: 'pending',
+        message: message || null
+      });
+      await interestRecord.save();
+    } catch (interestError) {
+      console.error('Error creating Interest record:', interestError);
+      // Don't fail the request if Interest model creation fails
+    }
+
+    // If message is provided, also create a Message record
+    if (message && message.trim()) {
+      const Message = (await import('../models/Message.js')).default;
+      const ChatRoom = (await import('../models/ChatRoom.js')).default;
+      
+      try {
+        // Get or create chat room
+        let chatRoom = await ChatRoom.findOne({
+          participants: { $all: [fromUserId, profileId] },
+          isActive: true
+        });
+
+        if (!chatRoom) {
+          chatRoom = await ChatRoom.create({
+            participants: [fromUserId, profileId],
+            isActive: true
+          });
+        }
+
+        // Create message
+        const messageDoc = await Message.create({
+          sender: fromUserId,
+          receiver: profileId,
+          content: message.trim(),
+          messageType: 'text'
+        });
+
+        // Update chat room
+        chatRoom.lastMessage = messageDoc._id;
+        chatRoom.lastMessageAt = messageDoc.createdAt;
+        await chatRoom.save();
+      } catch (msgError) {
+        console.error('Error creating message:', msgError);
+        // Don't fail the interest request if message creation fails
+      }
+    }
 
     // Update user's daily interest count
     user.dailyInterests = (user.dailyInterests || 0) + 1;
