@@ -26,6 +26,9 @@ const searchFilterSchema = new mongoose.Schema({
     occupation: [String],
     location: [String],
     maritalStatus: [String],
+    country: [String],
+    state: [String],
+    city: [String],
     incomeRange: {
       min: String,
       max: String

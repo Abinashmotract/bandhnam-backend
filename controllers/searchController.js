@@ -1,4 +1,5 @@
 import User from "../models/User.js";
+import SearchFilter from "../models/SearchFilter.js";
 
 // Get search criteria options
 export const getSearchCriteria = async (req, res) => {
@@ -193,7 +194,6 @@ export const searchByCriteria = async (req, res) => {
     // Other filters
     if (maritalStatus && maritalStatus.length > 0) {
       if (Array.isArray(maritalStatus)) {
-        // Handle multiple selections (e.g., ["never married", "divorced"])
         query.maritalStatus = {
           $in: maritalStatus.map((m) => m.toLowerCase().replace(/\s+/g, "_")),
         };
@@ -201,7 +201,6 @@ export const searchByCriteria = async (req, res) => {
         typeof maritalStatus === "string" &&
         maritalStatus !== "Doesn't Matter"
       ) {
-        // Handle single selection
         query.maritalStatus = maritalStatus.toLowerCase().replace(/\s+/g, "_");
       }
     }
@@ -250,7 +249,6 @@ export const searchByCriteria = async (req, res) => {
 
     if (occupation && occupation.length > 0) {
       if (Array.isArray(occupation)) {
-        // Handle multiple selections (e.g., ["never married", "divorced"])
         query.occupation = {
           $in: occupation.map((m) => m.toLowerCase().replace(/\s+/g, "_")),
         };
@@ -258,7 +256,6 @@ export const searchByCriteria = async (req, res) => {
         typeof occupation === "string" &&
         occupation !== "Doesn't Matter"
       ) {
-        // Handle single selection
         query.occupation = occupation.toLowerCase().replace(/\s+/g, "_");
       }
     }
@@ -378,7 +375,7 @@ export const searchByIdOrName = async (req, res) => {
     // Search by customId, name, or _id
     const profiles = await User.find({
       $and: [
-        { _id: { $ne: userId } }, // Exclude current user
+        { _id: { $ne: userId } },
         { isActive: true },
         {
           $or: [
@@ -422,31 +419,200 @@ export const searchByIdOrName = async (req, res) => {
   }
 };
 
-export const saveSearchHistory = async (req, res) => {
+// FIXED: Save search filter - Route Handler
+export const saveSearchFilterHandler = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { searchQuery } = req.body;
+    const { filters, name } = req.body;
 
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({
+    if (!filters) {
+      return res.status(400).json({
         success: false,
-        message: "User not found",
+        message: "Filters are required",
       });
     }
 
-    user.searchHistory.push(searchQuery);
-    await user.save();
+    // Create new search filter
+    const searchFilter = new SearchFilter({
+      user: userId,
+      name: name || "Saved Search",
+      filters: {
+        ageRange: {
+          min: filters.ageMin || null,
+          max: filters.ageMax || null,
+        },
+        heightRange: {
+          min: filters.heightMin || null,
+          max: filters.heightMax || null,
+        },
+        maritalStatus: Array.isArray(filters.maritalStatus)
+          ? filters.maritalStatus
+          : filters.maritalStatus
+          ? [filters.maritalStatus]
+          : [],
+        religion:
+          filters.religion && filters.religion !== "Doesn't Matter"
+            ? [filters.religion]
+            : [],
+        caste: filters.caste ? [filters.caste] : [],
+        motherTongue:
+          filters.motherTongue && filters.motherTongue !== "Doesn't Matter"
+            ? Array.isArray(filters.motherTongue)
+              ? filters.motherTongue
+              : [filters.motherTongue]
+            : [],
+        incomeRange: {
+          min: filters.annualIncomeMin || null,
+          max: filters.annualIncomeMax || null,
+        },
+        location:
+          filters.country && filters.country !== "Doesn't Matter"
+            ? [filters.country]
+            : [],
+        country:
+          filters.country && filters.country !== "Doesn't Matter"
+            ? [filters.country]
+            : [],
+        state:
+          filters.state && filters.state !== "Doesn't Matter"
+            ? [filters.state]
+            : [],
+        city:
+          filters.city && filters.city !== "Doesn't Matter"
+            ? [filters.city]
+            : [],
+        manglik:
+          filters.manglik && filters.manglik !== "Doesn't Matter"
+            ? [filters.manglik]
+            : [],
+        diet:
+          filters.diet && filters.diet !== "Doesn't Matter"
+            ? [filters.diet]
+            : [],
+        education:
+          filters.education && filters.education !== "Doesn't Matter"
+            ? [filters.education]
+            : [],
+        occupation: Array.isArray(filters.occupation)
+          ? filters.occupation
+          : filters.occupation
+          ? [filters.occupation]
+          : [],
+      },
+    });
+
+    await searchFilter.save();
+
+    res.status(201).json({
+      success: true,
+      message: "Search filter saved successfully",
+      data: searchFilter,
+    });
+  } catch (error) {
+    console.error("Error saving search filter:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to save search filter",
+      error: error.message,
+    });
+  }
+};
+
+export const getSavedSearches = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const savedSearches = await SearchFilter.find({
+      user: userId,
+      isActive: true,
+    })
+      .sort({ lastUsed: -1 })
+      .select("name filters lastUsed createdAt")
+      .lean();
 
     res.status(200).json({
       success: true,
-      message: "Search history saved successfully",
+      data: savedSearches,
     });
   } catch (error) {
-    console.error("Error saving search history:", error);
+    console.error("Error fetching saved searches:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to save search history",
+      message: "Failed to fetch saved searches",
+      error: error.message,
+    });
+  }
+};
+
+export const getSavedSearch = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { id } = req.params;
+
+    const savedSearch = await SearchFilter.findOne({
+      _id: id,
+      user: userId,
+      isActive: true,
+    });
+
+    if (!savedSearch) {
+      return res.status(404).json({
+        success: false,
+        message: "Saved search not found",
+      });
+    }
+
+    // Update last used timestamp
+    savedSearch.lastUsed = new Date();
+    await savedSearch.save();
+
+    res.status(200).json({
+      success: true,
+      data: savedSearch,
+    });
+  } catch (error) {
+    console.error("Error fetching saved search:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch saved search",
+      error: error.message,
+    });
+  }
+};
+
+export const deleteSavedSearch = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    const savedSearch = await SearchFilter.findOneAndUpdate(
+      {
+        _id: id,
+        user: userId,
+      },
+      {
+        isActive: false,
+      },
+      {
+        new: true,
+      }
+    );
+
+    if (!savedSearch) {
+      return res.status(404).json({
+        success: false,
+        message: "Saved search not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Saved search deleted successfully",
+    });
+  } catch (error) {
+    console.error("Error deleting saved search:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete saved search",
       error: error.message,
     });
   }
