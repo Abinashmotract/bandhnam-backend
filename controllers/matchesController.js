@@ -342,6 +342,30 @@ export const showInterest = async (req, res) => {
     });
 
     if (existingInterest) {
+      // Ensure Interest record exists for the Interest model (used by conversations)
+      try {
+        const Interest = (await import('../models/Interest.js')).default;
+        const existingInterestRecord = await Interest.findOne({
+          fromUser: fromUserId,
+          targetUser: profileId,
+          type: 'interest'
+        });
+        
+        // If Interest record doesn't exist, create it (it might only exist in Interaction model)
+        if (!existingInterestRecord) {
+          await Interest.create({
+            fromUser: fromUserId,
+            targetUser: profileId,
+            type: 'interest',
+            status: existingInterest.status === 'accepted' ? 'accepted' : 'pending',
+            message: existingInterest.messageContent || message || null
+          });
+        }
+      } catch (interestError) {
+        console.error('Error ensuring Interest record exists:', interestError);
+        // Continue to return error even if Interest record creation fails
+      }
+      
       return res.status(400).json({
         success: false,
         message: "Interest already shown"

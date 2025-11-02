@@ -421,6 +421,161 @@ export const getInterestsSent = async (req, res) => {
   }
 };
 
+// Accept an interest
+export const acceptInterest = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { interestId } = req.params;
+    const { responseMessage } = req.body;
+
+    // Find the interest using Interaction model
+    const interest = await Interaction.findById(interestId);
+    
+    if (!interest) {
+      return res.status(404).json({
+        success: false,
+        message: "Interest not found"
+      });
+    }
+
+    // Verify the interest is for the current user
+    if (interest.toUser.toString() !== userId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only accept interests sent to you"
+      });
+    }
+
+    // Check if already accepted
+    if (interest.status === 'accepted') {
+      return res.status(400).json({
+        success: false,
+        message: "Interest already accepted"
+      });
+    }
+
+    // Update Interaction status
+    interest.status = 'accepted';
+    interest.respondedAt = new Date();
+    if (responseMessage) {
+      interest.responseMessage = responseMessage;
+    }
+    await interest.save();
+
+    // Also update Interest model if it exists
+    try {
+      const Interest = (await import('../models/Interest.js')).default;
+      const interestRecord = await Interest.findOne({
+        fromUser: interest.fromUser,
+        targetUser: interest.toUser,
+        type: interest.type || 'interest'
+      });
+      
+      if (interestRecord) {
+        interestRecord.status = 'accepted';
+        interestRecord.respondedAt = new Date();
+        if (responseMessage) {
+          interestRecord.responseMessage = responseMessage;
+        }
+        await interestRecord.save();
+      }
+    } catch (err) {
+      console.error('Error updating Interest model:', err);
+      // Don't fail if Interest model update fails
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Interest accepted successfully",
+      data: {
+        interestId: interest._id,
+        status: interest.status
+      }
+    });
+  } catch (error) {
+    console.error("Error accepting interest:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to accept interest",
+      error: error.message
+    });
+  }
+};
+
+// Decline an interest
+export const declineInterest = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { interestId } = req.params;
+
+    // Find the interest using Interaction model
+    const interest = await Interaction.findById(interestId);
+    
+    if (!interest) {
+      return res.status(404).json({
+        success: false,
+        message: "Interest not found"
+      });
+    }
+
+    // Verify the interest is for the current user
+    if (interest.toUser.toString() !== userId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only decline interests sent to you"
+      });
+    }
+
+    // Check if already declined
+    if (interest.status === 'declined') {
+      return res.status(400).json({
+        success: false,
+        message: "Interest already declined"
+      });
+    }
+
+    // Update Interaction status
+    interest.status = 'declined';
+    interest.respondedAt = new Date();
+    await interest.save();
+
+    // Also update Interest model if it exists
+    try {
+      const Interest = (await import('../models/Interest.js')).default;
+      const interestRecord = await Interest.findOne({
+        fromUser: interest.fromUser,
+        targetUser: interest.toUser,
+        type: interest.type || 'interest'
+      });
+      
+      if (interestRecord) {
+        interestRecord.status = 'declined';
+        interestRecord.respondedAt = new Date();
+        await interestRecord.save();
+      }
+    } catch (err) {
+      console.error('Error updating Interest model:', err);
+      // Don't fail if Interest model update fails
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Interest declined successfully",
+      data: {
+        interestId: interest._id,
+        status: interest.status
+      }
+    });
+  } catch (error) {
+    console.error("Error declining interest:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to decline interest",
+      error: error.message
+    });
+  }
+};
+
 // Get online matches
 export const getOnlineMatches = async (req, res) => {
   try {

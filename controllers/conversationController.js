@@ -2,6 +2,16 @@ import User from '../models/User.js';
 import Interest from '../models/Interest.js';
 import Message from '../models/Message.js';
 
+// Helper function to construct image URL
+const getImageUrl = (baseUrl, imagePath) => {
+  if (!imagePath) return null;
+  if (imagePath.startsWith('http')) return imagePath;
+  if (imagePath.startsWith('uploads/') || imagePath.startsWith('/uploads/')) {
+    return `${baseUrl}/${imagePath.startsWith('/') ? imagePath.slice(1) : imagePath}`;
+  }
+  return `${baseUrl}/uploads/${imagePath}`;
+};
+
 // Get conversations for different tabs
 export const getConversations = async (req, res) => {
   try {
@@ -189,15 +199,6 @@ export const getMessengerOnlineMatches = async (req, res) => {
       .sort({ lastSeen: -1 });
 
     const baseUrl = `${req.protocol}://${req.get('host')}`;
-
-    const getImageUrl = (imagePath) => {
-      if (!imagePath) return null;
-      if (imagePath.startsWith('http')) return imagePath;
-      if (imagePath.startsWith('uploads/') || imagePath.startsWith('/uploads/')) {
-        return `${baseUrl}/${imagePath.startsWith('/') ? imagePath.slice(1) : imagePath}`;
-      }
-      return `${baseUrl}/uploads/${imagePath}`;
-    };
 
     res.status(200).json({
       success: true,

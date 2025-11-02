@@ -6,6 +6,8 @@ import {
   getInterestsReceived,
   getActivitySummary,
   getInterestsSent,
+  acceptInterest,
+  declineInterest,
 } from "../controllers/activityController.js";
 import { VerifyToken } from "../middlewares/authMiddleware.js";
 
@@ -19,6 +21,10 @@ router.get("/online-matches", VerifyToken, getOnlineMatches);
 router.get("/shortlisted", VerifyToken, getShortlistedProfiles);
 router.get("/interests/received", VerifyToken, getInterestsReceived);
 router.get("/interests/sent", VerifyToken, getInterestsSent);
+
+// Accept/Decline interests (using Interaction model IDs)
+router.post("/interests/:interestId/accept", VerifyToken, acceptInterest);
+router.post("/interests/:interestId/decline", VerifyToken, declineInterest);
 
 // Get activity summary
 router.get("/summary", VerifyToken, getActivitySummary);

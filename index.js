@@ -86,27 +86,295 @@ app.get('/api/matches/test', (req, res) => {
   });
 });
 
+// Import Socket.IO dependencies
+import { authenticateSocket } from './utils/socketAuth.js';
+import Message from './models/Message.js';
+import ChatRoom from './models/ChatRoom.js';
+import User from './models/User.js';
+
 const server = http.createServer(app);
 
 const io = new Server(server, {
-  cors: { origin: "http://localhost:5173", }
+  cors: { 
+    origin: ["http://localhost:5173", "http://localhost:5174"],
+    credentials: true
+  }
 });
 
+// Socket.IO authentication middleware
+io.use(authenticateSocket);
+
+// Store active user rooms: userId -> Set of roomIds
+const userRooms = new Map();
+
 io.on("connection", (socket) => {
-  console.log("Client connected:", socket.id);
+  console.log(`✅ Client connected: ${socket.id} (User: ${socket.userId})`);
 
-  socket.on("sender message", (msg) => {
-    console.log("Sender:", msg);
-    socket.broadcast.emit("receiver message", msg);
+  // Join user's personal room for notifications
+  const userRoom = `user_${socket.userId}`;
+  socket.join(userRoom);
+
+  // Update user online status
+  User.findByIdAndUpdate(socket.userId, { 
+    isOnline: true, 
+    lastSeen: new Date() 
+  }).catch(err => console.error('Error updating online status:', err));
+
+  // Join chat room with another user
+  socket.on('join_room', async (roomId) => {
+    try {
+      socket.join(roomId);
+      console.log(`User ${socket.userId} joined room: ${roomId}`);
+      
+      // Track user's rooms
+      if (!userRooms.has(socket.userId)) {
+        userRooms.set(socket.userId, new Set());
+      }
+      userRooms.get(socket.userId).add(roomId);
+    } catch (error) {
+      console.error('Error joining room:', error);
+    }
   });
 
-  socket.on("receiver message", (msg) => {
-    console.log("Receiver:", msg);
-    socket.broadcast.emit("sender message", msg);
+  // Leave chat room
+  socket.on('leave_room', (roomId) => {
+    socket.leave(roomId);
+    if (userRooms.has(socket.userId)) {
+      userRooms.get(socket.userId).delete(roomId);
+    }
+    console.log(`User ${socket.userId} left room: ${roomId}`);
   });
 
-  socket.on("disconnect", () => {
-    console.log("Client disconnected:", socket.id);
+  // Handle sending messages
+  socket.on('send_message', async (data) => {
+    try {
+      const { receiverId, content, messageType = 'text', roomId } = data;
+
+      if (!receiverId || !content) {
+        socket.emit('message_error', { message: 'Receiver ID and content are required' });
+        return;
+      }
+
+      const senderId = socket.userId;
+
+      // Create message in database
+      const message = await Message.create({
+        sender: senderId,
+        receiver: receiverId,
+        content: content.trim(),
+        messageType
+      });
+
+      // Get or create chat room
+      let chatRoom = await ChatRoom.findOne({
+        participants: { $all: [senderId, receiverId] },
+        isActive: true
+      });
+
+      if (!chatRoom) {
+        chatRoom = await ChatRoom.create({
+          participants: [senderId, receiverId],
+          isActive: true
+        });
+      }
+
+      // Update chat room
+      chatRoom.lastMessage = message._id;
+      chatRoom.lastMessageAt = message.createdAt;
+      
+      // Update unread counts
+      const receiverCount = chatRoom.messageCounts.find(mc => 
+        mc.user.toString() === receiverId
+      );
+      if (receiverCount) {
+        receiverCount.unreadCount = (receiverCount.unreadCount || 0) + 1;
+      } else {
+        chatRoom.messageCounts.push({
+          user: receiverId,
+          unreadCount: 1
+        });
+      }
+
+      // Clear sender's unread count
+      const senderCount = chatRoom.messageCounts.find(mc => 
+        mc.user.toString() === senderId
+      );
+      if (senderCount) {
+        senderCount.unreadCount = 0;
+      }
+
+      await chatRoom.save();
+
+      // Populate message with sender info
+      await message.populate('sender', 'name profileImage customId');
+      await message.populate('receiver', 'name profileImage customId');
+
+      // Emit to sender (confirmation)
+      socket.emit('message_sent', {
+        success: true,
+        message: {
+          _id: message._id,
+          content: message.content,
+          messageType: message.messageType,
+          sender: {
+            _id: message.sender._id,
+            name: message.sender.name,
+            profileImage: message.sender.profileImage,
+            customId: message.sender.customId
+          },
+          receiver: {
+            _id: message.receiver._id,
+            name: message.receiver.name
+          },
+          createdAt: message.createdAt,
+          isRead: message.isRead
+        }
+      });
+
+      // Emit to receiver (new message)
+      const receiverRoom = `user_${receiverId}`;
+      io.to(receiverRoom).emit('new_message', {
+        success: true,
+        message: {
+          _id: message._id,
+          content: message.content,
+          messageType: message.messageType,
+          sender: {
+            _id: message.sender._id,
+            name: message.sender.name,
+            profileImage: message.sender.profileImage,
+            customId: message.sender.customId
+          },
+          receiver: {
+            _id: message.receiver._id,
+            name: message.receiver.name
+          },
+          createdAt: message.createdAt,
+          isRead: message.isRead
+        },
+        chatRoomId: chatRoom._id.toString()
+      });
+
+      // Also emit to the chat room if users are in it
+      const chatRoomId = roomId || chatRoom._id.toString();
+      io.to(chatRoomId).emit('message_received', {
+        message: {
+          _id: message._id,
+          content: message.content,
+          messageType: message.messageType,
+          sender: {
+            _id: message.sender._id,
+            name: message.sender.name,
+            profileImage: message.sender.profileImage
+          },
+          createdAt: message.createdAt
+        }
+      });
+
+    } catch (error) {
+      console.error('Error sending message via socket:', error);
+      socket.emit('message_error', { 
+        message: error.message || 'Failed to send message' 
+      });
+    }
+  });
+
+  // Mark messages as read
+  socket.on('mark_read', async (data) => {
+    try {
+      const { senderId, messageIds } = data;
+      const receiverId = socket.userId;
+
+      if (messageIds && Array.isArray(messageIds)) {
+        await Message.updateMany(
+          { 
+            _id: { $in: messageIds },
+            sender: senderId,
+            receiver: receiverId,
+            isRead: false
+          },
+          { 
+            isRead: true,
+            readAt: new Date()
+          }
+        );
+      } else {
+        // Mark all messages from sender as read
+        await Message.updateMany(
+          {
+            sender: senderId,
+            receiver: receiverId,
+            isRead: false
+          },
+          {
+            isRead: true,
+            readAt: new Date()
+          }
+        );
+      }
+
+      // Update chat room unread count
+      const chatRoom = await ChatRoom.findOne({
+        participants: { $all: [senderId, receiverId] },
+        isActive: true
+      });
+
+      if (chatRoom) {
+        const receiverCount = chatRoom.messageCounts.find(mc => 
+          mc.user.toString() === receiverId
+        );
+        if (receiverCount) {
+          receiverCount.unreadCount = 0;
+          await chatRoom.save();
+        }
+      }
+
+      // Notify sender that messages were read
+      const senderRoom = `user_${senderId}`;
+      io.to(senderRoom).emit('messages_read', {
+        receiverId,
+        readAt: new Date()
+      });
+
+    } catch (error) {
+      console.error('Error marking messages as read:', error);
+    }
+  });
+
+  // Typing indicator
+  socket.on('typing_start', (data) => {
+    const { roomId, receiverId } = data;
+    const receiverRoom = `user_${receiverId}`;
+    socket.to(receiverRoom).emit('user_typing', {
+      userId: socket.userId,
+      userName: socket.userName,
+      roomId
+    });
+  });
+
+  socket.on('typing_stop', (data) => {
+    const { roomId, receiverId } = data;
+    const receiverRoom = `user_${receiverId}`;
+    socket.to(receiverRoom).emit('user_stopped_typing', {
+      userId: socket.userId,
+      roomId
+    });
+  });
+
+  // Handle disconnect
+  socket.on("disconnect", async () => {
+    console.log(`❌ Client disconnected: ${socket.id} (User: ${socket.userId})`);
+    
+    // Update user offline status
+    if (socket.userId) {
+      User.findByIdAndUpdate(socket.userId, { 
+        isOnline: false,
+        lastSeen: new Date()
+      }).catch(err => console.error('Error updating offline status:', err));
+    }
+
+    // Clean up user rooms
+    userRooms.delete(socket.userId);
   });
 });
 
