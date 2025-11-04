@@ -1,5 +1,6 @@
 import User from "../models/User.js";
 import Interaction from "../models/Interaction.js";
+import Notification from "../models/Notification.js";
 import mongoose from "mongoose";
 import { getCoordinatesFromLocation, calculateDistance } from '../utils/geocoding.js';
 
@@ -682,6 +683,108 @@ export const getMutualMatches = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Server error while fetching mutual matches",
+      error: error.message
+    });
+  }
+};
+
+// Request photo from a profile
+export const requestPhoto = async (req, res) => {
+  try {
+    const fromUserId = req.user.id;
+    const { profileId } = req.body;
+
+    if (!profileId) {
+      return res.status(400).json({
+        success: false,
+        message: "Profile ID is required"
+      });
+    }
+
+    if (fromUserId === profileId) {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot request photo from yourself"
+      });
+    }
+
+    // Check if target profile exists
+    const targetProfile = await User.findById(profileId);
+    if (!targetProfile) {
+      return res.status(404).json({
+        success: false,
+        message: "Profile not found"
+      });
+    }
+
+    // Check if photo request already exists (to prevent spam)
+    const existingRequest = await Interaction.findOne({
+      fromUser: fromUserId,
+      toUser: profileId,
+      type: 'message',
+      messageContent: { $regex: /photo.*request|request.*photo/i }
+    });
+
+    if (existingRequest) {
+      // Check if it was sent recently (within last 24 hours)
+      const oneDayAgo = new Date();
+      oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+      
+      if (existingRequest.createdAt > oneDayAgo) {
+        return res.status(400).json({
+          success: false,
+          message: "You have already requested photos from this profile recently. Please wait 24 hours before requesting again."
+        });
+      }
+    }
+
+    // Get current user info
+    const currentUser = await User.findById(fromUserId).select('name profileImage');
+
+    // Create interaction record
+    const interaction = await Interaction.create({
+      fromUser: fromUserId,
+      toUser: profileId,
+      type: 'message',
+      messageContent: 'Photo request',
+      messageType: 'system',
+      status: 'sent'
+    });
+
+    // Create notification for the target user
+    try {
+      await Notification.create({
+        userId: profileId,
+        type: 'message_received',
+        title: 'Photo Request',
+        message: `${currentUser.name} has requested to see more photos from you`,
+        relatedUserId: fromUserId,
+        metadata: {
+          interactionId: interaction._id,
+          requestType: 'photo_request'
+        },
+        actionUrl: `/profile/${fromUserId}`,
+        actionText: 'View Profile'
+      });
+    } catch (notifError) {
+      console.error('Error creating notification:', notifError);
+      // Don't fail the request if notification creation fails
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Photo request sent successfully",
+      data: {
+        interactionId: interaction._id,
+        requestedAt: interaction.createdAt
+      }
+    });
+
+  } catch (error) {
+    console.error("Request photo error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while requesting photo",
       error: error.message
     });
   }

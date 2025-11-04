@@ -5,6 +5,7 @@ import {
   showSuperInterest,
   getInterestLimits,
   getMutualMatches,
+  requestPhoto,
 } from "../controllers/matchesController.js";
 import {
   addToShortlist,
@@ -22,6 +23,7 @@ router.get("/", VerifyToken, getMatches);
 router.get("/mutual", VerifyToken, getMutualMatches);
 router.post("/interest", VerifyToken, showInterest);
 router.post("/super-interest", VerifyToken, showSuperInterest);
+router.post("/request-photo", VerifyToken, requestPhoto);
 router.get("/limits", VerifyToken, getInterestLimits);
 
 // shortlist routes

@@ -89,8 +89,8 @@ export const createCheckoutSession = async (req, res) => {
         },
       ],
       mode: 'payment',
-      success_url: `${process.env.FRONTEND_URL || 'http://localhost:5174'}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:5174'}/membership?cancelled=true`,
+      success_url: `${process.env.FRONTEND_URL || 'https://bandhan-ynnt.onrender.com'}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.FRONTEND_URL || 'https://bandhan-ynnt.onrender.com'}/membership?cancelled=true`,
       metadata: {
         userId: userId.toString(),
         planId: planId.toString()
@@ -675,6 +675,16 @@ export const getCheckoutSessionDetails = async (req, res) => {
     const transaction = await Transaction.findOne({ paymentIntentId: session.payment_intent })
       .populate('plan', 'name price duration features');
 
+    // Calculate amount - prioritize transaction, then session, then plan price
+    let amount = 0;
+    if (transaction?.amount) {
+      amount = transaction.amount;
+    } else if (session.amount_total) {
+      amount = session.amount_total / 100; // Convert from cents
+    } else if (plan?.price) {
+      amount = plan.price;
+    }
+
     // If payment is completed but no transaction exists, create one
     if (session.payment_status === 'paid' && !transaction) {
       try {
@@ -683,12 +693,17 @@ export const getCheckoutSessionDetails = async (req, res) => {
         const newTransaction = await Transaction.findOne({ paymentIntentId: session.payment_intent })
           .populate('plan', 'name price duration features');
         
+        // Update amount if transaction has it
+        if (newTransaction?.amount) {
+          amount = newTransaction.amount;
+        }
+        
         res.status(200).json({
           success: true,
           message: "Checkout session details retrieved successfully",
           data: {
             sessionId: session.id,
-            amount: session.amount_total / 100, // Convert from cents
+            amount: amount,
             currency: session.currency,
             paymentStatus: session.payment_status,
             plan: plan,
@@ -708,7 +723,7 @@ export const getCheckoutSessionDetails = async (req, res) => {
       message: "Checkout session details retrieved successfully",
       data: {
         sessionId: session.id,
-        amount: session.amount_total / 100, // Convert from cents
+        amount: amount,
         currency: session.currency,
         paymentStatus: session.payment_status,
         plan: plan,
