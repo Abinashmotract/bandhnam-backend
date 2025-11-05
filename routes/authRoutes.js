@@ -5,6 +5,8 @@ import {
     refreshAccessToken,
     forgotPassword,
     verifyOtp,
+    verifyEmailOtp,
+    resendVerificationOtp,
     resetPassword, getUserDetails, resendOtp, updateUser, logout,
     updateProfilePicture,
     uploadProfileImage,
@@ -22,6 +24,8 @@ router.post('/refresh-token', refreshAccessToken);
 router.post('/forgot-password', forgotPassword);
 router.post('/resend-otp', resendOtp);
 router.post('/verify-otp', verifyOtp);
+router.post('/verify-email', verifyEmailOtp);
+router.post('/resend-verification-otp', resendVerificationOtp);
 router.post('/reset-password', resetPassword);
 
 // Protected routes (require authentication)

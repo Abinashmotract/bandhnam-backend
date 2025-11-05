@@ -23,12 +23,12 @@ const transporter = nodemailer.createTransport({
 });
 
 export const sendWelcomeEmail = async (user) => {
-  const { name, email, phoneNumber, profileFor, gender } = user;
+  const { name, email, phoneNumber, profileFor, gender, otp } = user;
 
   const mailOptions = {
     from: "Kumarsinha2574@gmail.com",
     to: email,
-    subject: "Welcome to Bandhnam Nammatch!",
+    subject: "Welcome to Bandhnam Nammatch - Verify Your Email",
     html: `
       <h2>Hello ${name},</h2>
       <p>Thank you for registering with Bandhnam Nammatch - your journey to find the perfect partner begins now!</p>
@@ -40,7 +40,9 @@ export const sendWelcomeEmail = async (user) => {
         <li><strong>Profile For:</strong> ${profileFor}</li>
         ${gender ? `<li><strong>Gender:</strong> ${gender}</li>` : ""}
       </ul>
-      <p>We're excited to help you find your perfect match. Login to explore profiles and start connecting!</p>
+      <p><strong>Your Email Verification OTP: ${otp}</strong></p>
+      <p>Please enter this OTP to verify your email address. The OTP is valid for 10 minutes.</p>
+      <p>We're excited to help you find your perfect match. After verifying your email, you can login to explore profiles and start connecting!</p>
       <br />
       <p>Best regards,<br>Bandhnam Nammatch Team</p>
     `,
@@ -163,6 +165,11 @@ export const signup = async (req, res) => {
       }
     }
     // --- Create User ---
+    // Generate OTP for email verification
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpiry = new Date();
+    otpExpiry.setMinutes(otpExpiry.getMinutes() + 10); // OTP valid for 10 minutes
+
     const user = await User.create({
       name,
       email,
@@ -212,6 +219,9 @@ export const signup = async (req, res) => {
       photos,
       profileImage,
       agreeToTerms,
+      otp,
+      otpExpiry,
+      isEmailVerified: false,
     });
     // --- Send Welcome Email ---
     await sendWelcomeEmail(user);
@@ -721,7 +731,82 @@ export const forgotPassword = async (req, res) => {
   }
 };
 
-// -------------------- RESEND OTP --------------------
+// -------------------- RESEND VERIFICATION OTP --------------------
+export const resendVerificationOtp = async (req, res) => {
+  const { email } = req.body;
+  
+  if (!email) {
+    return res.status(400).json({ 
+      success: false, 
+      statusCode: 400, 
+      message: "Email is required" 
+    });
+  }
+
+  try {
+    const user = await User.findOne({ email });
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        statusCode: 404,
+        message: "User not found"
+      });
+    }
+
+    if (user.isEmailVerified) {
+      return res.status(400).json({
+        success: false,
+        statusCode: 400,
+        message: "Email is already verified"
+      });
+    }
+
+    // Generate new OTP
+    const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpiry = new Date();
+    otpExpiry.setMinutes(otpExpiry.getMinutes() + 10); // 10 minutes validity
+
+    user.otp = newOtp;
+    user.otpExpiry = otpExpiry;
+    await user.save();
+
+    // Send new OTP email
+    const mailOptions = {
+      from: "Kumarsinha2574@gmail.com",
+      to: email,
+      subject: "Email Verification - New OTP",
+      html: `
+        <h2>Hello ${user.name},</h2>
+        <p>You requested a new verification OTP. Here's your new code:</p>
+        <p><strong>Your Email Verification OTP: ${newOtp}</strong></p>
+        <p>This OTP will expire in 10 minutes.</p>
+        <p>If you didn't request this code, please ignore this email.</p>
+        <br />
+        <p>Best regards,<br>Bandhnam Nammatch Team</p>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    return res.status(200).json({
+      success: true,
+      statusCode: 200,
+      message: "New verification OTP sent successfully"
+    });
+
+  } catch (err) {
+    console.error("Resend verification OTP error:", err);
+    return res.status(500).json({
+      success: false,
+      statusCode: 500,
+      message: "Server error during OTP resend",
+      error: err.message
+    });
+  }
+};
+
+// -------------------- RESEND PASSWORD RESET OTP --------------------
 export const resendOtp = async (req, res) => {
   const { email } = req.body;
   if (!email)
@@ -789,6 +874,83 @@ export const resendOtp = async (req, res) => {
 };
 
 // -------------------- VERIFY OTP --------------------
+export const verifyEmailOtp = async (req, res) => {
+  const { email, code } = req.body;
+  const otp = code
+  
+  if (!email || !otp) {
+    return res.status(400).json({
+      success: false,
+      statusCode: 400,
+      message: "Email and OTP are required",
+    });
+  }
+
+  try {
+    const user = await User.findOne({ email });
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        statusCode: 404,
+        message: "User not found",
+      });
+    }
+
+    if (user.isEmailVerified) {
+      return res.status(400).json({
+        success: false,
+        statusCode: 400,
+        message: "Email is already verified",
+      });
+    }
+
+    if (!user.otp || !user.otpExpiry) {
+      return res.status(400).json({
+        success: false,
+        statusCode: 400,
+        message: "No OTP found. Please request a new OTP",
+      });
+    }
+
+    if (new Date() > user.otpExpiry) {
+      return res.status(400).json({
+        success: false,
+        statusCode: 400,
+        message: "OTP has expired. Please request a new OTP",
+      });
+    }
+
+    if (user.otp !== otp) {
+      return res.status(400).json({
+        success: false,
+        statusCode: 400,
+        message: "Invalid OTP",
+      });
+    }
+
+    // OTP is valid, mark email as verified
+    user.isEmailVerified = true;
+    user.otp = undefined;
+    user.otpExpiry = undefined;
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      statusCode: 200,
+      message: "Email verified successfully",
+    });
+  } catch (err) {
+    console.error("Email verification error:", err);
+    return res.status(500).json({
+      success: false,
+      statusCode: 500,
+      message: "Server error during email verification",
+      error: err.message,
+    });
+  }
+};
+
 export const verifyOtp = async (req, res) => {
   const { email, otp } = req.body;
   if (!email || !otp)
