@@ -224,7 +224,7 @@ export const getInterestsReceived = async (req, res) => {
     const userId = req.user.id;
     const { page = 1, limit = 10, status } = req.query;
 
-    const query = { targetUser: userId };
+    const query = { toUser: userId };
     if (status && status !== "all") {
       query.status = status;
     }
