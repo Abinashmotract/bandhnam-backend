@@ -447,7 +447,7 @@ export const acceptInterest = async (req, res) => {
     }
 
     // Check if already accepted
-    if (interest.status === 'accepted') {
+    if (interest.status === 'approved') {
       return res.status(400).json({
         success: false,
         message: "Interest already accepted"
@@ -455,7 +455,7 @@ export const acceptInterest = async (req, res) => {
     }
 
     // Update Interaction status
-    interest.status = 'accepted';
+    interest.status = 'approved';
     interest.respondedAt = new Date();
     if (responseMessage) {
       interest.responseMessage = responseMessage;
@@ -472,7 +472,7 @@ export const acceptInterest = async (req, res) => {
       });
       
       if (interestRecord) {
-        interestRecord.status = 'accepted';
+        interestRecord.status = 'approved';
         interestRecord.respondedAt = new Date();
         if (responseMessage) {
           interestRecord.responseMessage = responseMessage;

@@ -23,7 +23,7 @@ router.get("/interests/received", VerifyToken, getInterestsReceived);
 router.get("/interests/sent", VerifyToken, getInterestsSent);
 
 // Accept/Decline interests (using Interaction model IDs)
-router.post("/interests/:interestId/accept", VerifyToken, acceptInterest);
+router.post("/interests/:interestId/approved", VerifyToken, acceptInterest);
 router.post("/interests/:interestId/decline", VerifyToken, declineInterest);
 
 // Get activity summary

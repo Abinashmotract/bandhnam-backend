@@ -29,7 +29,7 @@ router.get("/limits", VerifyToken, getInterestLimits);
 // shortlist routes
 
 router.post("/shortlist", VerifyToken, addToShortlist);
-router.delete("/shortlist", VerifyToken, removeFromShortlist);
+router.delete("/shortlist/:id", VerifyToken, removeFromShortlist);
 router.get("/shortlist", VerifyToken, getShortlistedProfiles);
 router.get("/shortlist/status/:id", VerifyToken, checkShortlistStatus);
 router.delete("/shortlist/clear", VerifyToken, clearShortlist);

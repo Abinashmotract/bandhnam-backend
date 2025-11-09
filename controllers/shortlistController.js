@@ -10,7 +10,9 @@ export const addToShortlist = async (req, res) => {
   try {
     const { profileId } = req.body; // ID of the user to be shortlisted
     const currentUserId = req.user._id; // ID of the current user (from auth middleware)
-
+    console.log("Current User ID:", currentUserId);
+    console.log("Target User ID to remove:", userId);
+    console.log("Target User ID type:", typeof userId);
     // Check if user exists
     const userToShortlist = await User.findById(profileId);
     if (!userToShortlist) {
@@ -32,7 +34,11 @@ export const addToShortlist = async (req, res) => {
     const currentUser = await User.findById(currentUserId);
 
     // Check if already shortlisted
-    if (currentUser.shortlists.some(shortlist => shortlist.userId?.toString() === profileId)) {
+    if (
+      currentUser.shortlists.some(
+        (shortlist) => shortlist.userId?.toString() === profileId
+      )
+    ) {
       return res.status(400).json({
         success: false,
         message: "Profile is already in your shortlist",
@@ -40,17 +46,14 @@ export const addToShortlist = async (req, res) => {
     }
 
     // Add to shortlist with timestamp
-    await User.findByIdAndUpdate(
-      currentUserId,
-      {
-        $push: {
-          shortlists: {
-            userId: profileId,
-            shortlistedAt: new Date()
-          }
-        }
-      }
-    );
+    await User.findByIdAndUpdate(currentUserId, {
+      $push: {
+        shortlists: {
+          userId: profileId,
+          shortlistedAt: new Date(),
+        },
+      },
+    });
 
     res.status(200).json({
       success: true,
@@ -62,11 +65,10 @@ export const addToShortlist = async (req, res) => {
           profileImage: userToShortlist.profileImage,
           age: userToShortlist.dob ? calculateAge(userToShortlist.dob) : null,
           occupation: userToShortlist.occupation,
-          location: userToShortlist.location
-        }
-      }
+          location: userToShortlist.location,
+        },
+      },
     });
-
   } catch (error) {
     console.error("Add to shortlist error:", error);
     res.status(500).json({
@@ -87,13 +89,13 @@ export const removeFromShortlist = async (req, res) => {
     const { userId } = req.params;
     const currentUserId = req.user._id;
 
-    // Remove from shortlist
+    // Remove from shortlist using string comparison
     const updatedUser = await User.findByIdAndUpdate(
       currentUserId,
       {
         $pull: {
-          shortlists: { userId: userId }
-        }
+          shortlists: { userId: userId },
+        },
       },
       { new: true }
     );
@@ -109,7 +111,6 @@ export const removeFromShortlist = async (req, res) => {
       success: true,
       message: "Profile removed from shortlist successfully",
     });
-
   } catch (error) {
     console.error("Remove from shortlist error:", error);
     res.status(500).json({
@@ -119,7 +120,6 @@ export const removeFromShortlist = async (req, res) => {
     });
   }
 };
-
 /**
  * @desc    Get user's shortlisted profiles with details
  * @route   GET /api/users/shortlist
@@ -130,12 +130,12 @@ export const getShortlistedProfiles = async (req, res) => {
     const currentUserId = req.user._id;
 
     // Get user with populated shortlists
-    const user = await User.findById(currentUserId)
-      .populate({
-        path: 'shortlists.userId',
-        select: 'name profileImage dob occupation location education religion caste maritalStatus photos isOnline lastSeen profileCompletion customId',
-        match: { isActive: true } // Only include active users
-      });
+    const user = await User.findById(currentUserId).populate({
+      path: "shortlists.userId",
+      select:
+        "name profileImage dob occupation location education religion caste maritalStatus photos isOnline lastSeen profileCompletion customId",
+      match: { isActive: true }, // Only include active users
+    });
 
     if (!user) {
       return res.status(404).json({
@@ -146,8 +146,8 @@ export const getShortlistedProfiles = async (req, res) => {
 
     // Filter out any null users (deleted accounts) and format response
     const shortlistedProfiles = user.shortlists
-      .filter(shortlist => shortlist.userId) // Remove deleted users
-      .map(shortlist => ({
+      .filter((shortlist) => shortlist.userId) // Remove deleted users
+      .map((shortlist) => ({
         _id: shortlist.userId._id,
         customId: shortlist.userId.customId,
         name: shortlist.userId.name,
@@ -163,7 +163,7 @@ export const getShortlistedProfiles = async (req, res) => {
         lastSeen: shortlist.userId.lastSeen,
         profileCompletion: shortlist.userId.profileCompletion,
         photos: shortlist.userId.photos,
-        shortlistedAt: shortlist.shortlistedAt
+        shortlistedAt: shortlist.shortlistedAt,
       }))
       .sort((a, b) => new Date(b.shortlistedAt) - new Date(a.shortlistedAt)); // Sort by most recent
 
@@ -171,10 +171,9 @@ export const getShortlistedProfiles = async (req, res) => {
       success: true,
       data: {
         shortlistedProfiles,
-        count: shortlistedProfiles.length
-      }
+        count: shortlistedProfiles.length,
+      },
     });
-
   } catch (error) {
     console.error("Get shortlisted profiles error:", error);
     res.status(500).json({
@@ -196,21 +195,21 @@ export const checkShortlistStatus = async (req, res) => {
     const currentUserId = req.user._id;
 
     const user = await User.findById(currentUserId);
-    
+
     const isShortlisted = user.shortlists.some(
-      shortlist => shortlist.userId?.toString() === userId
+      (shortlist) => shortlist.userId?.toString() === userId
     );
 
     res.status(200).json({
       success: true,
       data: {
         isShortlisted,
-        shortlistedAt: isShortlisted 
-          ? user.shortlists.find(s => s.userId?.toString() === userId).shortlistedAt 
-          : null
-      }
+        shortlistedAt: isShortlisted
+          ? user.shortlists.find((s) => s.userId?.toString() === userId)
+              .shortlistedAt
+          : null,
+      },
     });
-
   } catch (error) {
     console.error("Check shortlist status error:", error);
     res.status(500).json({
@@ -230,18 +229,14 @@ export const clearShortlist = async (req, res) => {
   try {
     const currentUserId = req.user._id;
 
-    await User.findByIdAndUpdate(
-      currentUserId,
-      {
-        $set: { shortlists: [] }
-      }
-    );
+    await User.findByIdAndUpdate(currentUserId, {
+      $set: { shortlists: [] },
+    });
 
     res.status(200).json({
       success: true,
       message: "All shortlisted profiles cleared successfully",
     });
-
   } catch (error) {
     console.error("Clear shortlist error:", error);
     res.status(500).json({
@@ -258,10 +253,13 @@ function calculateAge(dob) {
   const today = new Date();
   let age = today.getFullYear() - birthDate.getFullYear();
   const monthDiff = today.getMonth() - birthDate.getMonth();
-  
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+
+  if (
+    monthDiff < 0 ||
+    (monthDiff === 0 && today.getDate() < birthDate.getDate())
+  ) {
     age--;
   }
-  
+
   return age;
 }
