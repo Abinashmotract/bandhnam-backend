@@ -4,6 +4,8 @@ import {
   getOnlineMatches,
   getShortlistedProfiles,
   getInterestsReceived,
+  getAcceptedInterests,
+  getDeclinedInterests,
   getActivitySummary,
   getInterestsSent,
   acceptInterest,
@@ -21,6 +23,10 @@ router.get("/online-matches", VerifyToken, getOnlineMatches);
 router.get("/shortlisted", VerifyToken, getShortlistedProfiles);
 router.get("/interests/received", VerifyToken, getInterestsReceived);
 router.get("/interests/sent", VerifyToken, getInterestsSent);
+
+// Get accepted and declined interests (received)
+router.get("/interests/accepted", VerifyToken, getAcceptedInterests);
+router.get("/interests/declined", VerifyToken, getDeclinedInterests);
 
 // Accept/Decline interests (using Interaction model IDs)
 router.post("/interests/:interestId/approved", VerifyToken, acceptInterest);

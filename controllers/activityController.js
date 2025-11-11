@@ -291,6 +291,146 @@ export const getInterestsReceived = async (req, res) => {
   }
 };
 
+// Get accepted interests (received and approved)
+export const getAcceptedInterests = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { page = 1, limit = 10 } = req.query;
+
+    const query = { fromUser: userId, status: "approved" };
+
+    const interests = await Interaction.find(query)
+      .populate(
+        "toUser",
+        "name age profileImage customId occupation education location city state maritalStatus isOnline lastSeen"
+      )
+      .sort({ respondedAt: -1, createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(parseInt(limit));
+
+    const totalCount = await Interaction.countDocuments(query);
+
+    const interestsData = interests.map((interest) => ({
+      id: interest._id,
+      toUser: {
+        id: interest.toUser._id,
+        name: interest.toUser.name,
+        age: interest.toUser.age,
+        profileImage: interest.toUser.profileImage,
+        customId: interest.toUser.customId,
+        occupation: interest.toUser.occupation,
+        education: interest.toUser.education,
+        location: interest.toUser.location,
+        city: interest.toUser.city,
+        state: interest.toUser.state,
+        maritalStatus: interest.toUser.maritalStatus,
+        isOnline: interest.toUser.isOnline,
+        lastSeen: interest.toUser.lastSeen,
+      },
+      type: interest.type,
+      status: interest.status,
+      message: interest.message,
+      isRead: interest.isRead,
+      createdAt: interest.createdAt,
+      respondedAt: interest.respondedAt,
+      responseMessage: interest.responseMessage,
+    }));
+
+    const totalPages = Math.ceil(totalCount / limit);
+    console.log("interestsData", interestsData);
+    res.status(200).json({
+      success: true,
+      data: {
+        interests: interestsData,
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages,
+          totalCount,
+          hasNext: page < totalPages,
+          hasPrev: page > 1,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching accepted interests:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch accepted interests",
+      error: error.message,
+    });
+  }
+};
+
+// Get declined interests (received and declined)
+export const getDeclinedInterests = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { page = 1, limit = 10 } = req.query;
+
+    const query = { fromUser: userId, status: "declined" };
+
+    const interests = await Interaction.find(query)
+      .populate(
+        "toUser",
+        "name age profileImage customId occupation education location city state maritalStatus isOnline lastSeen"
+      )
+      .sort({ respondedAt: -1, createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(parseInt(limit));
+
+    const totalCount = await Interaction.countDocuments(query);
+
+    const interestsData = interests.map((interest) => ({
+      id: interest._id,
+      toUser: {
+        id: interest.toUser._id,
+        name: interest.toUser.name,
+        age: interest.toUser.age,
+        profileImage: interest.toUser.profileImage,
+        customId: interest.toUser.customId,
+        occupation: interest.toUser.occupation,
+        education: interest.toUser.education,
+        location: interest.toUser.location,
+        city: interest.toUser.city,
+        state: interest.toUser.state,
+        maritalStatus: interest.toUser.maritalStatus,
+        isOnline: interest.toUser.isOnline,
+        lastSeen: interest.toUser.lastSeen,
+      },
+      type: interest.type,
+      status: interest.status,
+      message: interest.message,
+      isRead: interest.isRead,
+      createdAt: interest.createdAt,
+      respondedAt: interest.respondedAt,
+      responseMessage: interest.responseMessage,
+    }));
+
+    const totalPages = Math.ceil(totalCount / limit);
+    console.log("interests", interestsData);
+    res.status(200).json({
+      success: true,
+      data: {
+        interests: interestsData,
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages,
+          totalCount,
+          hasNext: page < totalPages,
+          hasPrev: page > 1,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching declined interests:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch declined interests",
+      error: error.message,
+    });
+  }
+};
+
 // Get interests sent with details
 export const getInterestsSent = async (req, res) => {
   try {
@@ -430,11 +570,11 @@ export const acceptInterest = async (req, res) => {
 
     // Find the interest using Interaction model
     const interest = await Interaction.findById(interestId);
-    
+
     if (!interest) {
       return res.status(404).json({
         success: false,
-        message: "Interest not found"
+        message: "Interest not found",
       });
     }
 
@@ -442,20 +582,20 @@ export const acceptInterest = async (req, res) => {
     if (interest.toUser.toString() !== userId.toString()) {
       return res.status(403).json({
         success: false,
-        message: "You can only accept interests sent to you"
+        message: "You can only accept interests sent to you",
       });
     }
 
     // Check if already accepted
-    if (interest.status === 'approved') {
+    if (interest.status === "approved") {
       return res.status(400).json({
         success: false,
-        message: "Interest already accepted"
+        message: "Interest already accepted",
       });
     }
 
     // Update Interaction status
-    interest.status = 'approved';
+    interest.status = "approved";
     interest.respondedAt = new Date();
     if (responseMessage) {
       interest.responseMessage = responseMessage;
@@ -464,15 +604,15 @@ export const acceptInterest = async (req, res) => {
 
     // Also update Interest model if it exists
     try {
-      const Interest = (await import('../models/Interest.js')).default;
+      const Interest = (await import("../models/Interest.js")).default;
       const interestRecord = await Interest.findOne({
         fromUser: interest.fromUser,
         targetUser: interest.toUser,
-        type: interest.type || 'interest'
+        type: interest.type || "interest",
       });
-      
+
       if (interestRecord) {
-        interestRecord.status = 'approved';
+        interestRecord.status = "approved";
         interestRecord.respondedAt = new Date();
         if (responseMessage) {
           interestRecord.responseMessage = responseMessage;
@@ -480,7 +620,7 @@ export const acceptInterest = async (req, res) => {
         await interestRecord.save();
       }
     } catch (err) {
-      console.error('Error updating Interest model:', err);
+      console.error("Error updating Interest model:", err);
       // Don't fail if Interest model update fails
     }
 
@@ -489,15 +629,15 @@ export const acceptInterest = async (req, res) => {
       message: "Interest accepted successfully",
       data: {
         interestId: interest._id,
-        status: interest.status
-      }
+        status: interest.status,
+      },
     });
   } catch (error) {
     console.error("Error accepting interest:", error);
     res.status(500).json({
       success: false,
       message: "Failed to accept interest",
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -510,11 +650,11 @@ export const declineInterest = async (req, res) => {
 
     // Find the interest using Interaction model
     const interest = await Interaction.findById(interestId);
-    
+
     if (!interest) {
       return res.status(404).json({
         success: false,
-        message: "Interest not found"
+        message: "Interest not found",
       });
     }
 
@@ -522,39 +662,39 @@ export const declineInterest = async (req, res) => {
     if (interest.toUser.toString() !== userId.toString()) {
       return res.status(403).json({
         success: false,
-        message: "You can only decline interests sent to you"
+        message: "You can only decline interests sent to you",
       });
     }
 
     // Check if already declined
-    if (interest.status === 'declined') {
+    if (interest.status === "declined") {
       return res.status(400).json({
         success: false,
-        message: "Interest already declined"
+        message: "Interest already declined",
       });
     }
 
     // Update Interaction status
-    interest.status = 'declined';
+    interest.status = "declined";
     interest.respondedAt = new Date();
     await interest.save();
 
     // Also update Interest model if it exists
     try {
-      const Interest = (await import('../models/Interest.js')).default;
+      const Interest = (await import("../models/Interest.js")).default;
       const interestRecord = await Interest.findOne({
         fromUser: interest.fromUser,
         targetUser: interest.toUser,
-        type: interest.type || 'interest'
+        type: interest.type || "interest",
       });
-      
+
       if (interestRecord) {
-        interestRecord.status = 'declined';
+        interestRecord.status = "declined";
         interestRecord.respondedAt = new Date();
         await interestRecord.save();
       }
     } catch (err) {
-      console.error('Error updating Interest model:', err);
+      console.error("Error updating Interest model:", err);
       // Don't fail if Interest model update fails
     }
 
@@ -563,15 +703,15 @@ export const declineInterest = async (req, res) => {
       message: "Interest declined successfully",
       data: {
         interestId: interest._id,
-        status: interest.status
-      }
+        status: interest.status,
+      },
     });
   } catch (error) {
     console.error("Error declining interest:", error);
     res.status(500).json({
       success: false,
       message: "Failed to decline interest",
-      error: error.message
+      error: error.message,
     });
   }
 };
