@@ -11,7 +11,8 @@ import {
   getAllTransactions,
   getTransactionById,
   getCheckoutSessionDetails,
-  processPaymentManually
+  processPaymentManually,
+  testRazorpayConfig
 } from "../controllers/subscriptionController.js";
 import { VerifyToken } from "../middlewares/authMiddleware.js";
 
@@ -19,6 +20,8 @@ const router = express.Router();
 
 // Public routes
 router.get("/plans", getSubscriptionPlans);
+// Test endpoint for debugging Razorpay config
+router.get("/test-razorpay-config", testRazorpayConfig);
 
 // Protected routes
 router.get("/status", VerifyToken, getSubscriptionStatus);

@@ -7,6 +7,7 @@
     "start": "node index.js",
     "seed": "node scripts/seedProfiles.js",
     "clear": "node scripts/clearData.js",
+    "clear-stripe": "node scripts/clearStripeData.js",
     "create-test-data": "node scripts/createTestData.js",
     "test-apis": "node scripts/testAllAPIs.js",
     "clear-and-seed": "node scripts/clearAndSeedData.js",
@@ -32,7 +33,7 @@
     "node-fetch": "^3.3.2",
     "nodemailer": "^7.0.6",
     "socket.io": "^4.8.1",
-    "stripe": "^19.0.0"
+    "razorpay": "^2.9.2"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"

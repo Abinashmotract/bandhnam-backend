@@ -16,15 +16,23 @@ const transactionSchema = new mongoose.Schema({
     ref: "UserMembership",
     required: true
   },
-  // Stripe payment details
-  paymentIntentId: {
+  // Razorpay payment details
+  orderId: {
     type: String,
     required: true,
     unique: true
   },
-  stripeChargeId: {
-    type: String,
-    required: true
+  paymentId: {
+    type: String
+  },
+  razorpayOrderId: {
+    type: String
+  },
+  razorpayPaymentId: {
+    type: String
+  },
+  razorpaySignature: {
+    type: String
   },
   amount: {
     type: Number,
@@ -80,7 +88,8 @@ const transactionSchema = new mongoose.Schema({
 
 // Indexes for efficient queries
 transactionSchema.index({ user: 1, createdAt: -1 });
-transactionSchema.index({ paymentIntentId: 1 });
+transactionSchema.index({ orderId: 1 });
+transactionSchema.index({ paymentId: 1 });
 transactionSchema.index({ status: 1 });
 transactionSchema.index({ createdAt: -1 });
 

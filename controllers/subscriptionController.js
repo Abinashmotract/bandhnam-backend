@@ -2,21 +2,79 @@ import User from "../models/User.js";
 import MembershipPlan from "../models/MembershipPlan.js";
 import UserMembership from "../models/UserMembership.js";
 import Transaction from "../models/Transaction.js";
-import Stripe from 'stripe';
+import Razorpay from 'razorpay';
+import crypto from 'crypto';
 import { sendInvoiceEmail } from '../utils/sendInvoiceEmail.js';
 
-// Initialize Stripe lazily to ensure environment variables are loaded
-let stripe = null;
+// Initialize Razorpay lazily to ensure environment variables are loaded
+let razorpay = null;
 
-const getStripe = () => {
-  if (!stripe) {
-    if (!process.env.STRIPE_SECRET_KEY) {
-      console.error('❌ STRIPE_SECRET_KEY is required but not found in environment variables.');
-      throw new Error('STRIPE_SECRET_KEY environment variable is required');
+const getRazorpay = () => {
+  if (!razorpay) {
+    // Support both naming conventions (including common typos)
+    const keyId = process.env.RAZORPAY_KEY_ID || 
+                  process.env.RAZORPAY_API_KEY || 
+                  process.env.RAZERPAY_API_KEY; // Support typo variant
+    const keySecret = process.env.RAZORPAY_KEY_SECRET || 
+                      process.env.RAZORPAY_API_SECRET_KEY || 
+                      process.env.RAZERPAY_API_SECRET_KEY; // Support typo variant
+    
+    // Debug logging
+    console.log('🔍 Checking Razorpay environment variables...');
+    console.log('   RAZORPAY_KEY_ID:', process.env.RAZORPAY_KEY_ID ? '✅ Set' : '❌ Not set');
+    console.log('   RAZORPAY_API_KEY:', process.env.RAZORPAY_API_KEY ? '✅ Set' : '❌ Not set');
+    console.log('   RAZERPAY_API_KEY (typo):', process.env.RAZERPAY_API_KEY ? '✅ Set' : '❌ Not set');
+    console.log('   RAZORPAY_KEY_SECRET:', process.env.RAZORPAY_KEY_SECRET ? '✅ Set' : '❌ Not set');
+    console.log('   RAZORPAY_API_SECRET_KEY:', process.env.RAZORPAY_API_SECRET_KEY ? '✅ Set' : '❌ Not set');
+    console.log('   RAZERPAY_API_SECRET_KEY (typo):', process.env.RAZERPAY_API_SECRET_KEY ? '✅ Set' : '❌ Not set');
+    console.log('   Final keyId:', keyId ? '✅ Found' : '❌ Missing');
+    console.log('   Final keySecret:', keySecret ? '✅ Found' : '❌ Missing');
+    
+    if (!keyId || !keySecret) {
+      console.error('❌ Razorpay API keys are required but not found in environment variables.');
+      console.error('   Please set either:');
+      console.error('   - RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET, OR');
+      console.error('   - RAZORPAY_API_KEY and RAZORPAY_API_SECRET_KEY');
+      console.error('   Make sure to restart the server after updating .env file');
+      throw new Error('Razorpay environment variables are required');
     }
-    stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+    
+    console.log('✅ Razorpay initialized successfully');
+    razorpay = new Razorpay({
+      key_id: keyId,
+      key_secret: keySecret
+    });
   }
-  return stripe;
+  return razorpay;
+};
+
+// Test endpoint to check Razorpay environment variables (for debugging)
+export const testRazorpayConfig = async (req, res) => {
+  try {
+    const keyId = process.env.RAZORPAY_KEY_ID || process.env.RAZORPAY_API_KEY;
+    const keySecret = process.env.RAZORPAY_KEY_SECRET || process.env.RAZORPAY_API_SECRET_KEY;
+    
+    return res.status(200).json({
+      success: true,
+      message: "Razorpay configuration check",
+      data: {
+        RAZORPAY_KEY_ID: process.env.RAZORPAY_KEY_ID ? 'Set' : 'Not set',
+        RAZORPAY_API_KEY: process.env.RAZORPAY_API_KEY ? 'Set' : 'Not set',
+        RAZORPAY_KEY_SECRET: process.env.RAZORPAY_KEY_SECRET ? 'Set' : 'Not set',
+        RAZORPAY_API_SECRET_KEY: process.env.RAZORPAY_API_SECRET_KEY ? 'Set' : 'Not set',
+        finalKeyId: keyId ? 'Found' : 'Missing',
+        finalKeySecret: keySecret ? 'Found' : 'Missing',
+        keyIdLength: keyId ? keyId.length : 0,
+        keySecretLength: keySecret ? keySecret.length : 0
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Error checking configuration",
+      error: error.message
+    });
+  }
 };
 
 // Get subscription status
@@ -50,7 +108,7 @@ export const getSubscriptionStatus = async (req, res) => {
   }
 };
 
-// Create Stripe Checkout Session for hosted payment page
+// Create Razorpay Order for payment
 export const createCheckoutSession = async (req, res) => {
   try {
     const { planId } = req.body;
@@ -67,50 +125,48 @@ export const createCheckoutSession = async (req, res) => {
     if (plan.planType === 'free') {
       return res.status(400).json({
         success: false,
-        message: "Cannot create checkout session for free plan"
+        message: "Cannot create order for free plan"
       });
     }
 
-    // Create checkout session
-    const stripeInstance = getStripe();
-    const session = await stripeInstance.checkout.sessions.create({
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price_data: {
-            currency: 'inr',
-            product_data: {
-              name: `${plan.name} Plan`,
-              description: plan.description || `Access to ${plan.name} features for ${plan.duration}`,
-            },
-            unit_amount: plan.price * 100, // Convert to paise
-          },
-          quantity: 1,
-        },
-      ],
-      mode: 'payment',
-      success_url: `${process.env.FRONTEND_URL || 'https://bandhan-ynnt.onrender.com'}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.FRONTEND_URL || 'https://bandhan-ynnt.onrender.com'}/membership?cancelled=true`,
-      metadata: {
+    // Create Razorpay order
+    const razorpayInstance = getRazorpay();
+    
+    // Generate a short receipt (Razorpay limit: 40 characters)
+    // Format: rec_<userId_last6chars>_<timestamp_last6chars>
+    const userIdShort = userId.toString().slice(-6);
+    const timestampShort = Date.now().toString().slice(-6);
+    const receipt = `rec_${userIdShort}_${timestampShort}`;
+    
+    const options = {
+      amount: plan.price * 100, // Convert to paise
+      currency: 'INR',
+      receipt: receipt, // Max 40 characters
+      notes: {
         userId: userId.toString(),
-        planId: planId.toString()
-      },
-      customer_email: req.user.email,
-    });
+        planId: planId.toString(),
+        planName: plan.name,
+        duration: plan.duration
+      }
+    };
+
+    const order = await razorpayInstance.orders.create(options);
 
     res.status(200).json({
       success: true,
-      message: "Checkout session created successfully",
+      message: "Order created successfully",
       data: {
-        sessionId: session.id,
-        url: session.url
+        orderId: order.id,
+        amount: order.amount,
+        currency: order.currency,
+        keyId: process.env.RAZORPAY_KEY_ID || process.env.RAZORPAY_API_KEY || process.env.RAZERPAY_API_KEY
       }
     });
   } catch (error) {
-    console.error("Create checkout session error:", error);
+    console.error("Create order error:", error);
     res.status(500).json({
       success: false,
-      message: "Server error while creating checkout session",
+      message: "Server error while creating order",
       error: error.message
     });
   }
@@ -119,14 +175,28 @@ export const createCheckoutSession = async (req, res) => {
 // Confirm payment and create subscription
 export const confirmPayment = async (req, res) => {
   try {
-    const { paymentIntentId, planId } = req.body;
+    const { orderId, paymentId, signature, planId } = req.body;
     const userId = req.user.id;
 
-    // Verify payment intent with Stripe
-    const stripeInstance = getStripe();
-    const paymentIntent = await stripeInstance.paymentIntents.retrieve(paymentIntentId);
+    // Verify payment signature with Razorpay
+    const razorpayInstance = getRazorpay();
+    const keySecret = process.env.RAZORPAY_KEY_SECRET || process.env.RAZORPAY_API_SECRET_KEY || process.env.RAZERPAY_API_SECRET_KEY;
+    const generatedSignature = crypto
+      .createHmac('sha256', keySecret)
+      .update(`${orderId}|${paymentId}`)
+      .digest('hex');
+
+    if (generatedSignature !== signature) {
+      return res.status(400).json({
+        success: false,
+        message: "Payment verification failed"
+      });
+    }
+
+    // Verify payment with Razorpay
+    const payment = await razorpayInstance.payments.fetch(paymentId);
     
-    if (paymentIntent.status !== 'succeeded') {
+    if (payment.status !== 'captured' && payment.status !== 'authorized') {
       return res.status(400).json({
         success: false,
         message: "Payment not completed"
@@ -166,7 +236,7 @@ export const confirmPayment = async (req, res) => {
       startDate,
       endDate,
       isActive: true,
-      paymentIntentId,
+      paymentIntentId: orderId,
       profileViewsUsed: 0,
       interestsUsed: 0,
       shortlistsUsed: 0,
@@ -180,14 +250,16 @@ export const confirmPayment = async (req, res) => {
       user: userId,
       plan: planId,
       subscription: userMembership._id,
-      paymentIntentId,
-      stripeChargeId: paymentIntent.charges.data[0]?.id || paymentIntent.id,
+      orderId,
+      paymentId,
+      razorpayOrderId: orderId,
+      razorpayPaymentId: paymentId,
+      razorpaySignature: signature,
       amount: plan.price,
       currency: 'INR',
       status: 'succeeded',
-      paymentMethod: 'card',
-      description: `${plan.name} Plan Subscription (${plan.duration})`,
-      receiptUrl: paymentIntent.charges.data[0]?.receipt_url
+      paymentMethod: payment.method || 'card',
+      description: `${plan.name} Plan Subscription (${plan.duration})`
     });
 
     await transaction.save();
@@ -353,34 +425,51 @@ export const updateUsage = async (req, res) => {
   }
 };
 
-// Stripe webhook handler
+// Razorpay webhook handler
 export const handleWebhook = async (req, res) => {
   try {
-    const sig = req.headers['stripe-signature'];
-    const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    const webhookSignature = req.headers['x-razorpay-signature'];
+    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
 
-    let event;
-
-    try {
-      const stripeInstance = getStripe();
-      event = stripeInstance.webhooks.constructEvent(req.body, sig, endpointSecret);
-    } catch (err) {
-      console.error('Webhook signature verification failed:', err.message);
-      return res.status(400).send(`Webhook Error: ${err.message}`);
+    if (!webhookSecret) {
+      console.error('RAZORPAY_WEBHOOK_SECRET is not configured');
+      return res.status(400).send('Webhook secret not configured');
     }
 
+    // Verify webhook signature
+    const shasum = crypto.createHmac('sha256', webhookSecret);
+    shasum.update(JSON.stringify(req.body));
+    const digest = shasum.digest('hex');
+
+    if (digest !== webhookSignature) {
+      console.error('Webhook signature verification failed');
+      return res.status(400).send('Invalid signature');
+    }
+
+    const event = req.body;
+
     // Handle the event
-    switch (event.type) {
-      case 'checkout.session.completed':
-        const session = event.data.object;
-        console.log('Checkout session completed:', session.id);
+    switch (event.event) {
+      case 'payment.captured':
+        const payment = event.payload.payment.entity;
+        console.log('Payment captured:', payment.id);
         
         // Create subscription and transaction
         try {
-          const { userId, planId } = session.metadata;
+          const orderId = payment.order_id;
+          const order = await getRazorpay().orders.fetch(orderId);
+          const { userId, planId } = order.notes;
+          
           const plan = await MembershipPlan.findById(planId);
           
-          if (plan) {
+          if (plan && payment.status === 'captured') {
+            // Check if transaction already exists
+            const existingTransaction = await Transaction.findOne({ orderId });
+            if (existingTransaction) {
+              console.log('Transaction already exists for order:', orderId);
+              return res.status(200).json({ received: true });
+            }
+
             // Calculate subscription dates
             const startDate = new Date();
             let endDate = new Date();
@@ -393,6 +482,12 @@ export const handleWebhook = async (req, res) => {
               endDate.setFullYear(endDate.getFullYear() + 1);
             }
 
+            // Deactivate current subscription if exists
+            await UserMembership.updateMany(
+              { user: userId, isActive: true },
+              { isActive: false }
+            );
+
             // Create subscription
             const userMembership = new UserMembership({
               user: userId,
@@ -400,7 +495,7 @@ export const handleWebhook = async (req, res) => {
               startDate,
               endDate,
               isActive: true,
-              paymentIntentId: session.payment_intent,
+              paymentIntentId: orderId,
               profileViewsUsed: 0,
               interestsUsed: 0,
               shortlistsUsed: 0,
@@ -414,14 +509,15 @@ export const handleWebhook = async (req, res) => {
               user: userId,
               plan: planId,
               subscription: userMembership._id,
-              paymentIntentId: session.payment_intent,
-              stripeChargeId: session.payment_intent,
+              orderId,
+              paymentId: payment.id,
+              razorpayOrderId: orderId,
+              razorpayPaymentId: payment.id,
               amount: plan.price,
               currency: 'INR',
               status: 'succeeded',
-              paymentMethod: 'card',
-              description: `${plan.name} Plan Subscription (${plan.duration})`,
-              receiptUrl: session.receipt_url
+              paymentMethod: payment.method || 'card',
+              description: `${plan.name} Plan Subscription (${plan.duration})`
             });
 
             await transaction.save();
@@ -461,19 +557,15 @@ export const handleWebhook = async (req, res) => {
             console.log('Subscription created successfully via webhook');
           }
         } catch (error) {
-          console.error('Error processing checkout session completion:', error);
+          console.error('Error processing payment capture:', error);
         }
         break;
-      case 'payment_intent.succeeded':
-        const paymentIntent = event.data.object;
-        console.log('PaymentIntent succeeded:', paymentIntent.id);
-        break;
-      case 'payment_intent.payment_failed':
-        const failedPayment = event.data.object;
-        console.log('PaymentIntent failed:', failedPayment.id);
+      case 'payment.failed':
+        const failedPayment = event.payload.payment.entity;
+        console.log('Payment failed:', failedPayment.id);
         break;
       default:
-        console.log(`Unhandled event type ${event.type}`);
+        console.log(`Unhandled event type ${event.event}`);
     }
 
     res.status(200).json({ received: true });
@@ -549,7 +641,8 @@ export const getAllTransactions = async (req, res) => {
     
     if (search) {
       query.$or = [
-        { paymentIntentId: { $regex: search, $options: 'i' } },
+        { orderId: { $regex: search, $options: 'i' } },
+        { paymentId: { $regex: search, $options: 'i' } },
         { description: { $regex: search, $options: 'i' } }
       ];
     }
@@ -643,25 +736,25 @@ export const getTransactionById = async (req, res) => {
   }
 };
 
-// Get checkout session details for payment success page
+// Get order details for payment success page
 export const getCheckoutSessionDetails = async (req, res) => {
   try {
-    const { sessionId } = req.params;
+    const { sessionId } = req.params; // This is actually orderId in Razorpay
     const userId = req.user.id;
 
-    // Retrieve session from Stripe
-    const stripeInstance = getStripe();
-    const session = await stripeInstance.checkout.sessions.retrieve(sessionId);
+    // Retrieve order from Razorpay
+    const razorpayInstance = getRazorpay();
+    const order = await razorpayInstance.orders.fetch(sessionId);
 
-    if (!session) {
+    if (!order) {
       return res.status(404).json({
         success: false,
-        message: "Checkout session not found"
+        message: "Order not found"
       });
     }
 
-    // Get plan details from metadata
-    const { planId } = session.metadata;
+    // Get plan details from notes
+    const { planId } = order.notes;
     const plan = await MembershipPlan.findById(planId);
 
     if (!plan) {
@@ -672,78 +765,51 @@ export const getCheckoutSessionDetails = async (req, res) => {
     }
 
     // Get transaction details if available
-    const transaction = await Transaction.findOne({ paymentIntentId: session.payment_intent })
+    const transaction = await Transaction.findOne({ orderId: sessionId })
       .populate('plan', 'name price duration features');
 
-    // Calculate amount - prioritize transaction, then session, then plan price
+    // Calculate amount - prioritize transaction, then order, then plan price
     let amount = 0;
     if (transaction?.amount) {
       amount = transaction.amount;
-    } else if (session.amount_total) {
-      amount = session.amount_total / 100; // Convert from cents
+    } else if (order.amount) {
+      amount = order.amount / 100; // Convert from paise
     } else if (plan?.price) {
       amount = plan.price;
     }
 
-    // If payment is completed but no transaction exists, create one
-    if (session.payment_status === 'paid' && !transaction) {
-      try {
-        await processCompletedPayment(session, userId, planId);
-        // Refetch transaction after creating it
-        const newTransaction = await Transaction.findOne({ paymentIntentId: session.payment_intent })
-          .populate('plan', 'name price duration features');
-        
-        // Update amount if transaction has it
-        if (newTransaction?.amount) {
-          amount = newTransaction.amount;
-        }
-        
-        res.status(200).json({
-          success: true,
-          message: "Checkout session details retrieved successfully",
-          data: {
-            sessionId: session.id,
-            amount: amount,
-            currency: session.currency,
-            paymentStatus: session.payment_status,
-            plan: plan,
-            transaction: newTransaction,
-            customerEmail: session.customer_email,
-            receiptUrl: session.receipt_url
-          }
-        });
-        return;
-      } catch (processError) {
-        console.error("Error processing completed payment:", processError);
-      }
+    // Get payment status
+    let paymentStatus = 'pending';
+    if (transaction) {
+      paymentStatus = transaction.status === 'succeeded' ? 'paid' : transaction.status;
+    } else if (order.status === 'paid') {
+      paymentStatus = 'paid';
     }
 
     res.status(200).json({
       success: true,
-      message: "Checkout session details retrieved successfully",
+      message: "Order details retrieved successfully",
       data: {
-        sessionId: session.id,
+        orderId: order.id,
         amount: amount,
-        currency: session.currency,
-        paymentStatus: session.payment_status,
+        currency: order.currency,
+        paymentStatus: paymentStatus,
         plan: plan,
-        transaction: transaction,
-        customerEmail: session.customer_email,
-        receiptUrl: session.receipt_url
+        transaction: transaction
       }
     });
   } catch (error) {
-    console.error("Get checkout session details error:", error);
+    console.error("Get order details error:", error);
     res.status(500).json({
       success: false,
-      message: "Server error while retrieving checkout session details",
+      message: "Server error while retrieving order details",
       error: error.message
     });
   }
 };
 
 // Helper function to process completed payment
-const processCompletedPayment = async (session, userId, planId) => {
+const processCompletedPayment = async (order, paymentId, userId, planId) => {
   const plan = await MembershipPlan.findById(planId);
   
   if (!plan) {
@@ -769,7 +835,7 @@ const processCompletedPayment = async (session, userId, planId) => {
     startDate,
     endDate,
     isActive: true,
-    paymentIntentId: session.payment_intent,
+    paymentIntentId: order.id,
     profileViewsUsed: 0,
     interestsUsed: 0,
     shortlistsUsed: 0,
@@ -783,14 +849,15 @@ const processCompletedPayment = async (session, userId, planId) => {
     user: userId,
     plan: planId,
     subscription: userMembership._id,
-    paymentIntentId: session.payment_intent,
-    stripeChargeId: session.payment_intent,
+    orderId: order.id,
+    paymentId: paymentId,
+    razorpayOrderId: order.id,
+    razorpayPaymentId: paymentId,
     amount: plan.price,
     currency: 'INR',
     status: 'succeeded',
     paymentMethod: 'card',
-    description: `${plan.name} Plan Subscription (${plan.duration})`,
-    receiptUrl: session.receipt_url
+    description: `${plan.name} Plan Subscription (${plan.duration})`
   });
 
   await transaction.save();
@@ -827,28 +894,28 @@ const processCompletedPayment = async (session, userId, planId) => {
     console.error('Error sending invoice email:', emailError);
   }
 
-  console.log('Payment processed successfully for session:', session.id);
+  console.log('Payment processed successfully for order:', order.id);
   return transaction;
 };
 
 // Manual payment processing endpoint for testing
 export const processPaymentManually = async (req, res) => {
   try {
-    const { sessionId } = req.body;
+    const { orderId, paymentId } = req.body;
     const userId = req.user.id;
 
-    // Retrieve session from Stripe
-    const stripeInstance = getStripe();
-    const session = await stripeInstance.checkout.sessions.retrieve(sessionId);
+    // Retrieve order from Razorpay
+    const razorpayInstance = getRazorpay();
+    const order = await razorpayInstance.orders.fetch(orderId);
 
-    if (!session) {
+    if (!order) {
       return res.status(404).json({
         success: false,
-        message: "Checkout session not found"
+        message: "Order not found"
       });
     }
 
-    if (session.payment_status !== 'paid') {
+    if (order.status !== 'paid') {
       return res.status(400).json({
         success: false,
         message: "Payment not completed yet"
@@ -856,7 +923,7 @@ export const processPaymentManually = async (req, res) => {
     }
 
     // Check if already processed
-    const existingTransaction = await Transaction.findOne({ paymentIntentId: session.payment_intent });
+    const existingTransaction = await Transaction.findOne({ orderId });
     if (existingTransaction) {
       return res.status(200).json({
         success: true,
@@ -866,8 +933,8 @@ export const processPaymentManually = async (req, res) => {
     }
 
     // Process the payment
-    const { planId } = session.metadata;
-    const transaction = await processCompletedPayment(session, userId, planId);
+    const { planId } = order.notes;
+    const transaction = await processCompletedPayment(order, paymentId, userId, planId);
 
     res.status(200).json({
       success: true,
