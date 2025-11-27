@@ -129,7 +129,9 @@ export const createCheckoutSession = async (req, res) => {
       });
     }
 
-    // Create Razorpay order
+    // Create Razorpay order for one-time subscription payment
+    // Note: Payment methods (UPI, Cards, Netbanking, Wallets) are controlled by Razorpay account settings
+    // To enable international cards, configure in Razorpay Dashboard: Settings > Payment Methods
     const razorpayInstance = getRazorpay();
     
     // Generate a short receipt (Razorpay limit: 40 characters)
@@ -142,11 +144,14 @@ export const createCheckoutSession = async (req, res) => {
       amount: plan.price * 100, // Convert to paise
       currency: 'INR',
       receipt: receipt, // Max 40 characters
+      // Payment methods are enabled by default based on Razorpay account settings
+      // UPI, Cards, Netbanking, and Wallets will be available if enabled in dashboard
       notes: {
         userId: userId.toString(),
         planId: planId.toString(),
         planName: plan.name,
-        duration: plan.duration
+        duration: plan.duration,
+        paymentType: 'one_time_subscription' // Mark as one-time subscription payment
       }
     };
 
