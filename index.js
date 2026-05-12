@@ -50,7 +50,9 @@ app.use(cors({
     "http://localhost:5173",
     "http://localhost:5174",
     "https://bandhan-ynnt.onrender.com",
-    "https://bandhanm-panel.onrender.com"
+    "https://bandhanm-panel.onrender.com",
+    "https://bandhnam.com",
+    "https://www.bandhnam.com"
   ],
   credentials: true
 }));
