@@ -2,8 +2,8 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
-const ADMIN_EMAIL = "";
-const ADMIN_PASSWORD = ""; // You can hash it if you want
+const ADMIN_EMAIL = "bandhnam@example.com";
+const ADMIN_PASSWORD = "Bandhnam@123"; // You can hash it if you want
 
 // Admin login function
 export const adminLogin = async (req, res) => {

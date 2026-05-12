@@ -52,7 +52,8 @@ app.use(cors({
     "https://bandhan-ynnt.onrender.com",
     "https://bandhanm-panel.onrender.com",
     "https://bandhnam.com",
-    "https://www.bandhnam.com"
+    "https://www.bandhnam.com",
+    "https://panel.bandhnam.com"
   ],
   credentials: true
 }));
