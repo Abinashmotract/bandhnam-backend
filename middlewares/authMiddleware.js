@@ -1,6 +1,8 @@
 // middlewares/authMiddleware.js
 import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
 import User from "../models/User.js";
+import AdminCredential from "../models/AdminCredential.js";
 
 export const VerifyToken = async (req, res, next) => {
   const token = req.headers.authorization?.split(" ")[1];
@@ -9,9 +11,29 @@ export const VerifyToken = async (req, res, next) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Agar admin hai to DB check skip
     if (decoded.role === "admin") {
-      req.user = decoded; 
+      const adminLookup = [];
+      if (decoded.id && mongoose.Types.ObjectId.isValid(decoded.id)) {
+        adminLookup.push({ _id: decoded.id });
+      }
+      if (decoded.email && typeof decoded.email === "string") {
+        adminLookup.push({ email: decoded.email.toLowerCase().trim() });
+      }
+
+      if (!adminLookup.length) {
+        return res.status(401).json({ message: "Invalid admin token" });
+      }
+
+      const admin = await AdminCredential.findOne({
+        $or: adminLookup,
+        isActive: true,
+      }).select("_id email");
+
+      if (!admin) {
+        return res.status(401).json({ message: "Admin not found or inactive" });
+      }
+
+      req.user = { ...decoded, id: admin._id, email: admin.email };
       return next();
     }
 

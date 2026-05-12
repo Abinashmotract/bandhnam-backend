@@ -1,16 +1,14 @@
 // admin/controllers/adminLogin.js
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-
-const ADMIN_EMAIL = "bandhnam@example.com";
-const ADMIN_PASSWORD = "Bandhnam@123"; // You can hash it if you want
+import AdminCredential from "../../models/AdminCredential.js";
 
 // Admin login function
 export const adminLogin = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    if (!email || !password) {
+    if (!email || !password || typeof email !== "string" || typeof password !== "string") {
       return res.status(400).json({
         status: 400,
         success: false,
@@ -18,8 +16,12 @@ export const adminLogin = async (req, res) => {
       });
     }
 
-    // Check email
-    if (email !== ADMIN_EMAIL) {
+    const admin = await AdminCredential.findOne({
+      email: email.toLowerCase().trim(),
+      isActive: true,
+    });
+
+    if (!admin) {
       return res.status(401).json({
         status: 401,
         success: false,
@@ -27,8 +29,7 @@ export const adminLogin = async (req, res) => {
       });
     }
 
-    // Compare password
-    const isPasswordCorrect = await bcrypt.compare(password, await bcrypt.hash(ADMIN_PASSWORD, 10));
+    const isPasswordCorrect = await bcrypt.compare(password, admin.password);
     if (!isPasswordCorrect) {
       return res.status(401).json({
         status: 401,
@@ -39,7 +40,11 @@ export const adminLogin = async (req, res) => {
 
     // Generate JWT token
     const jwtSecret = process.env.JWT_SECRET || "your_jwt_secret";
-    const token = jwt.sign({ role: "admin", email: ADMIN_EMAIL }, jwtSecret, { expiresIn: "30d" });
+    const token = jwt.sign(
+      { role: "admin", email: admin.email, id: admin._id },
+      jwtSecret,
+      { expiresIn: "30d" }
+    );
 
     // Set cookie
     res.cookie("admin_token", token, {
